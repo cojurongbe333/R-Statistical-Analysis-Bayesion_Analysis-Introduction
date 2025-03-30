@@ -1,0 +1,286 @@
+---
+title: "STA6990: Week 10"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+```{r}
+library(readxl)
+library(gridExtra)
+library(glmnet)
+library(nnet)
+library(boot)
+library(fastDummies)
+library(haven)
+library(lindia)
+library(tidyverse)
+library(gsheet)
+library(DescTools)
+library(FSA)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(agricolae)
+library(gmodels)
+library(dplyr)
+library(car)
+library(readr)
+library(broom)
+library(modelr)
+library(performance)
+library(GGally)
+library(emmeans)
+library(visreg)
+library(see)
+library(patchwork)
+library(caret)
+library(bayesrules)
+```
+
+**1. In each situation below, we observe the outcomes for a Normal random sample, $Y_i|\mu \overset{\text{iid}}\sim N(\mu, \sigma^2)$**
+
+**1a. $(y_1, y_2, y_3) = (-4.3, 0.7, -19.4)$ and $\sigma = 10$**
+
+```{r}
+y_1a <- c(-4.3, 0.7, -19.4)
+sigma_1a <- 10
+sample_mean1a <- mean(y_1a)
+n_1a <- length(y_1a)
+sample_variance1a <- var(y_1a)
+SEM <- sigma_1a / sqrt(n_1a)
+cat("Sample mean:", sample_mean1a, "\n")
+cat("Sample variance:", sample_variance1a, "\n")
+cat("Standard Error of the Mean (SEM):", SEM, "\n")
+```
+
+**1b. $(y_1, y_2, y_3, y_4) = (-12, 1.2, -4.5, 0.6)$ and $\sigma = 6$**
+
+```{r}
+y_1b <- c(-12, 1.2, -4.5, 0.6)
+sigma_1b <- 6
+sample_mean1b <- mean(y_1b)
+n_1b <- length(y_1b)
+sample_variance1b <- var(y_1b)
+SEM <- sigma_1b / sqrt(n_1b)
+cat("Sample mean:", sample_mean1b, "\n")
+cat("Sample variance:", sample_variance1b, "\n")
+cat("Standard Error of the Mean (SEM):", SEM, "\n")
+```
+
+**1c. $(y_1, y_2) = (12.4, 6.1)$ and $\sigma = 5$**
+
+```{r}
+y_1c <- c(12.4, 6.1)
+sigma_1c <- 5
+sample_mean1c <- mean(y_1c)
+n_1c <- length(y_1c)
+sample_variance1c <- var(y_1c)
+SEM_1c <- sigma_1c / sqrt(n_1c)
+cat("Sample mean:", sample_mean1c, "\n")
+cat("Sample variance:", sample_variance1c, "\n")
+cat("Sample Mean:", sample_mean1c, "SEM:", SEM_1c, "\n")
+```
+
+**1d. $(y_1, y_2, y_3, y_4, y_5) = (1.6, 0.09, 1.7, 1.1, 1.1)$ and $\sigma = 0.6$**
+
+```{r}
+y_1d <- c(1.6, 0.09, 1.7, 1.1, 1.1)
+sigma_1d <- 0.6
+sample_mean1d <- mean(y_1d)
+n_1d <- length(y_1d)
+sample_variance1d <- var(y_1d)
+SEM_1d <- sigma_1d / sqrt(n_1d)
+cat("Sample mean:", sample_mean1d, "\n")
+cat("Sample variance:", sample_variance1d, "\n")
+cat("Sample Mean:", sample_mean1d, "SEM:", SEM_1d, "\n")
+
+```
+
+**2. We used the Normal-Normal model to analyze the mean hippocampal volume among people who have sustained concussions. In this exercise we will explore the mean volume for people who have not been diagnosed with a concussion.** 
+
+**2a. Use the football data to calculate the sample mean hippocampal volume and sample size of the control subjects who have *not* been diagnosed with a concussion; use the same values as before ($\sigma = 0.5$, $\theta = 6.5$, $\tau = 0.4$).**
+
+```{r}
+data("football")
+
+control_data <- football %>% 
+  filter(group == "control")
+
+sample_mean_volume_control <- mean(control_data$volume, na.rm = TRUE)
+
+sample_size_control <- sum(!is.na(control_data$volume))
+
+cat("Sample mean hippocampal volume for control subjects:", sample_mean_volume_control, "\n")
+cat("Sample size for control subjects:", sample_size_control, "\n")
+```
+
+**2b. Identify the posterior model of $\mu$. Remember to state your updated parameters.**
+
+```{r}
+theta_2b <- 6.5
+tau_2b <- 0.4
+sigma_2b <- 0.5
+n_2b <- 25
+y_bar2b <- 7.6026
+
+mu_prime2b <- ((theta_2b / tau_2b^2) + (n_2b * y_bar2b / sigma_2b^2)) / ((1 / tau_2b^2) + (n_2b / sigma_2b^2))
+sigma_prime_squared <- 1 / ((1 / tau_2b^2) + (n_2b / sigma_2b^2))
+
+cat("Posterior mean (mu'):", mu_prime2b, "\n")
+cat("Posterior variance (sigma_2b'^2):", sigma_prime_squared, "\n")
+```
+To identify the posterior model of μ using the Normal-Normal model, we'll start with a prior normal distribution for μ and a normal likelihood function. Given that σ is known, the prior for μ is N(θ,τ^2), where θ is the prior mean and τ is the prior standard deviation. The likelihood of observing the data given μ is N(μ,σ^2).
+The parameters provided earlier were:
+•	σ=0.5 (known standard deviation of the observation errors)
+•	θ=6.5 (prior mean of μ)
+•	τ=0.4 (prior standard deviation of μ)
+
+From the football data for control subjects, we found:
+•	The sample mean hippocampal volume (yˉ) is approximately 7.60 cm^3
+•	The sample size (n) is 25
+
+The posterior distribution of μ in a Normal-Normal model is also normal, with its mean (μ′) and variance (σ′2) calculated as follows:
+μ′= (θ/τ^2+nyˉ/σ^2)/1/τ^2+n/σ^2)
+σ′^2=(1/ τ^2+n/ σ2)^−1
+
+The posterior model of μ is a normal distribution N(μ′,σ′^2) with updated parameters:
+•	The posterior mean μ′ is approximately 7.54
+•	The posterior variance σ′^2 is approximately 0.0094
+This indicates that after observing the data from the control subjects, our belief about the mean hippocampal volume among people who have not been diagnosed with a concussion has been updated to reflect a tighter certainty around the mean of 7.54cm^3, with a very small variance, indicating high confidence in this estimate.
+
+**2c. Plot the prior pdf, likelihood function, and posterior pdf of $\mu$.**
+
+```{r}
+theta_2c <- 6.5
+tau_2c <- 0.4
+
+y_bar2c <- 7.60
+n_2c <- 25
+sigma_2c <- 0.5
+
+mu_prime_2c <- 7.54
+sigma_prime_2c <- sqrt(0.0094)
+
+mu_values2c <- seq(6, 9, length.out = 1000)
+
+prior2c <- dnorm(mu_values2c, mean = theta_2c, sd = tau_2c)
+
+likelihood2c <- dnorm(mu_values2c, mean = y_bar2c, sd = sigma_2c / sqrt(n_2c))
+
+posterior2c <- dnorm(mu_values2c, mean = mu_prime_2c, sd = sigma_prime_2c)
+
+plot_data <- data.frame(mu_values2c, prior2c, likelihood2c, posterior2c)
+
+ggplot(plot_data, aes(x = mu_values2c)) +
+  geom_line(aes(y = prior2c, color = "Prior")) +
+  geom_line(aes(y = likelihood2c, color = "Likelihood")) +
+  geom_line(aes(y = posterior2c, color = "Posterior")) +
+  scale_color_manual(values = c("Prior" = "blue", "Likelihood" = "red", "Posterior" = "green")) +
+  labs(title = "Prior, Likelihood, and Posterior of μ",
+       x = expression(mu),
+       y = "Density") +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+Prior PDF is defined by N(θ,τ^2), with θ=6.5 and τ=0.4.
+
+Likelihood Function: Since we're visualizing this as a function of μ given the observed data, we'll consider it proportional to the normal pdf with mean yˉ and variance σ^2/n, where yˉ=7.60, σ=0.5, and n=25.
+
+Posterior PDF is defined by N(μ′,σ′^2), with μ′=7.54 and σ′^2=0.0094.
+
+The blue line depicts the prior distribution of μ, which is centered at θ=6.5 and has a standard deviation of τ=0.4. This distribution reflects our initial belief about the average hippocampus volume before any data is observed.
+
+The orange line is the probability function, which is proportional and centered at the sample mean yˉ=7.60. It illustrates how the observed data affects our views about μ.
+
+The green line represents the posterior distribution of μ, which is centered around the posterior mean μ′=7.54. The spread of this distribution is significantly narrower, with a standard deviation of σ′^2=0.0094. This illustrates the revised view about the mean hippocampus volume after taking into account both the prior belief and the observed facts.
+
+**3. Let $\mu$ be the average 3 pm temperature in Perth, Australia. Not knowing much about Australian weather, your friend's prior understanding is that the average temperature is likely around 30 degrees Celsius, though might be anywhere between 10 and 50 degrees Celsius. To learn about $\mu$, they plan to analyze 1000 days of temperature data. Letting $Y_i$ denote the 3 pm temperature on day $i$, they'll assume that daily temperatures vary Normally around $\mu$ with a standard deviation of 5 degrees. ie., $Y_i|\mu = N(\mu, 5^2)$.**
+
+**3a. Tune and plot a Normal prior for $\mu$ that reflects your friend's understanding.**
+
+```{r}
+theta_3a <- 30  
+tau_3a <- (50 - 10) / 4    
+
+mu_range3a <- seq(0, 60, length.out = 1000)
+
+prior_pdf3a <- dnorm(mu_range3a, mean = theta_3a, sd = tau_3a)
+
+ggplot(data = data.frame(mu_range3a, prior_pdf3a), aes(x = mu_range3a, y = prior_pdf3a)) +
+  geom_line(color = "blue") +
+  labs(title = "Normal Prior for μ",
+       x = expression(mu ~ "(Temperature in Celsius)"),
+       y = "Density") +
+  theme_minimal()
+```
+
+**3b. The `weather_perth` data in the `bayesrules` package includes 1000 daily observations of 3 pm temperatures in Perth (`temp3pm`). Plot this data and discuss whether it's reasonable to assume a Normal model for the temperature data.**
+
+```{r}
+data("weather_perth")
+
+ggplot(weather_perth, aes(x = temp3pm)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 35, fill = "skyblue", color = "black") +
+  geom_density(alpha = .2, fill = "#FF6666") +
+  labs(title = "Distribution of 3 PM Temperatures in Perth", x = "Temperature (°C)", y = "Density") +
+  theme_minimal()
+
+mean_temperature <- mean(weather_perth$temp3pm)
+mean_temperature
+
+```
+The distribution exhibits a generally bell-shaped and symmetrical form, indicating that a Normal distribution may be a suitable model for this data. 
+There is a prominent peak slightly to the right of the center, which corresponds with your friend's hypothesis that the average temperature is approximately 30 degrees Celsius.
+The presence of tails, especially the left tail, indicates a potential minor asymmetry or departure from a perfectly symmetrical Normal distribution, although this divergence does not appear to be significant.
+
+The observed average temperature is 24.0009 degrees.
+
+**3c. Identify the posterior model of $\mu$.**
+
+```{r}
+n_actual <- 1000  
+sigma_actual <- 5  
+theta_actual <- 30  
+tau_actual <- (50 - 10) / 4   
+y_bar_actual <- 24.0009  
+
+mu_prime_actual <- ((theta_actual / tau_actual^2) + (n_actual * y_bar_actual / sigma_actual^2)) / ((1 / tau_actual^2) + (n_actual / sigma_actual^2))
+sigma_prime_squared_actual <- 1 / ((1 / tau_actual^2) + (n_actual / sigma_actual^2))
+
+cat("Posterior mean (mu'):", mu_prime_actual, "\n")
+cat("Posterior variance (sigma'^2):", sigma_prime_squared_actual, "\n")
+```
+After examining 1000 days of temperature data around 3 pm, we have determined that our revised estimation of the average temperature 24.0024 is very close to the observed sample mean of 24.0009°C, with a little posterior variance. The little range observed in the estimate of the average 3 pm temperature in Perth indicates a high level of certainty. This is due to the large sample size of 1000 data points used in the analysis.
+
+**3d. Plot the prior pdf, likelihood function, and posterior pdf of $\mu$.**
+
+```{r}
+mu_range3d <- seq(10, 40, length.out = 1000)
+
+prior_pdf3d <- dnorm(mu_range3d, mean = theta_actual, sd = tau_actual)
+
+likelihood_pdf3d <- dnorm(mu_range3d, mean = y_bar_actual, sd = sigma_actual)
+
+posterior_pdf3d <- dnorm(mu_range3d, mean = mu_prime_actual, sd = sqrt(sigma_prime_squared_actual))
+
+data_prior3d <- data.frame(mu_range3d, Density = prior_pdf3d, Distribution = 'Prior')
+data_likelihood3d <- data.frame(mu_range3d, Density = likelihood_pdf3d, Distribution = 'Likelihood')
+data_posterior3d <- data.frame(mu_range3d, Density = posterior_pdf3d, Distribution = 'Posterior')
+
+data_combined <- rbind(data_prior3d, data_likelihood3d, data_posterior3d)
+
+ggplot(data_combined, aes(x = mu_range3d, y = Density, color = Distribution)) +
+  geom_line() +
+  labs(title = "Distributions of μ", x = "Temperature (°C)", y = "Density") +
+  theme_minimal() +
+  scale_color_manual(values = c("Prior" = "blue", "Likelihood" = "red", "Posterior" = "green"))
+```
+
+
+

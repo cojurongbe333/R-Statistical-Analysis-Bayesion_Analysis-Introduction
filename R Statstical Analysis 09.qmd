@@ -1,0 +1,481 @@
+---
+title: "STA6990: Project 1"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+
+```{r}
+library(stats)
+library(rstan)
+library(bayesplot)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(janitor)
+library(tidyr)
+library(gridExtra)
+library(stats)
+library(base)
+library(zoo)
+library(patchwork)
+library(MASS)
+library(Matrix)
+library(DescTools)
+library(purrr)
+library(caret)
+library(boot)
+library(lattice)
+library(GGally)
+library(emmeans)
+library(modelr)
+library(broom)
+library(performance)
+library(FSA)
+library(car)
+library(RcppEigen)
+library(Rcpp)
+```
+
+**1. Consider the Beta-Binomial model for $\pi$ with $Y|\pi \sim \text{Bin}(n, \pi)$ and $\pi \sim \text{Beta}(3, 8)$. Suppose that in $n=10$ independent trials, you observe $Y=2$ successes.**
+
+**a. Utilize grid approximation with grid values $\pi \in \{ 0, 0.25, 0.5, 0.75, 1 \}$ to approximate the posterior model of $\pi$.**
+
+```{r}
+alpha_prior_1a <- 3
+beta_prior_1a <- 8
+n_1a <- 10
+Y_1a <- 2
+pi_grid_1a <- c(0, 0.25, 0.5, 0.75, 1)
+
+prior_pdf_1a <- dbeta(pi_grid_1a, alpha_prior_1a, beta_prior_1a)
+
+likelihood_1a <- dbinom(Y_1a, n_1a, pi_grid_1a)
+
+unnormalized_posterior_1a <- likelihood_1a * prior_pdf_1a
+
+normalized_posterior_1a <- unnormalized_posterior_1a / sum(unnormalized_posterior_1a)
+
+results_1a <- data.frame(pi=pi_grid_1a, Prior=prior_pdf_1a, Likelihood=likelihood_1a, 
+                      Unnormalized=unnormalized_posterior_1a, 
+                      Normalized=normalized_posterior_1a)
+print(results_1a)
+```
+
+When π is equal to 0, the posterior probability is also 0. This is not surprising because it is impossible to observe any successes when the likelihood of success is 0.
+At π=0.25, the normalized posterior probability is roughly 0.9647. This means that, given the observed data (Y=2 successes out of n=10 trials) and the prior belief π∼Beta(3,8), π=0.25 is the most likely value among the grid points.
+When π is equal to 0.5, the normalized posterior probability is roughly 0.0353.
+
+For a given value of π=0.75, the normalized posterior probability is around 0.00000545, suggesting an extremely low likelihood for this particular value of π.
+When π is equal to 1, the posterior probability is 0. This is not surprising, as it is impossible to observe any failures when the likelihood of success is 1.
+
+**b. Repeat part a using a grid of 201 equally spaced values between 0 and 1.**
+
+```{r}
+alpha_prior_1b <- 3
+beta_prior_1b <- 8
+n_1b <- 10
+Y_1b <- 2
+pi_grid_1b <- seq(0, 1, length.out = 201)  
+
+prior_pdf_1b <- dbeta(pi_grid_1b, alpha_prior_1b, beta_prior_1b)
+
+likelihood_1b <- dbinom(Y_1b, n_1b, pi_grid_1b)
+
+unnormalized_posterior_1b <- likelihood_1b * prior_pdf_1b
+
+normalized_posterior_1b <- unnormalized_posterior_1b / sum(unnormalized_posterior_1b)
+
+results_1b <- data.frame(Pi=pi_grid_1b, Prior=prior_pdf_1b, Likelihood=likelihood_1b, 
+                      Unnormalized=unnormalized_posterior_1b, 
+                      Normalized=normalized_posterior_1b)
+
+head(results_1b)
+
+plot(results_1b$Pi, results_1b$Normalized, type='l', col='blue', lwd=2,
+     xlab='Pi', ylab='Normalized Posterior Probability',
+     main='Normalized Posterior Distribution')
+```
+
+The posterior probability reaches its maximum at a specific value of π and decreases gradually when π deviates from this maximum. This peak shows the most probable value of π based on the provided facts and prior belief. As the value of π approaches 0 or 1, the posterior probability tends to decrease towards zero. This aligns with the assumptions of the Beta-Binomial model, particularly when considering the prior Beta(3,8), which indicates a prior belief in a decreased probability of success before witnessing the data.
+
+**c. Simulate the posterior model of $\pi$ with RStan using 3 chains and 12000 iterations per chain.**
+
+```{r}
+stan_model_code <- "
+data {
+  int<lower=0> n; // Number of trials
+  int<lower=0> Y; // Number of successes
+  
+}
+parameters {
+  real<lower=0, upper=1> pi; // Probability of success
+}
+model {
+  pi ~ beta(3, 8); // Prior distribution
+  Y ~ binomial(n, pi); // Likelihood
+}
+"
+
+stan_data <- list(
+  n = 10,
+  Y = 2
+)
+
+fit <- stan(model_code = stan_model_code, 
+            data = stan_data, 
+            chains = 3, 
+            iter = 12000, 
+            warmup = 6000, 
+            seed = 333) 
+
+print(fit)
+
+plot(fit)
+```
+The calculated average estimate for the mathematical constant π is 0.24.
+The posterior samples for π have a standard deviation (sd) of 0.09.
+The lowest bound of the 95% credible range for π is 0.09, while the upper bound is 0.44.
+
+The sample size for estimating π is 6602, which is considered large compared to the total number of post-warmup draws (18000), indicating that we have a high-quality sample from the posterior distribution. The potential scale reduction factor (R^) is 1, indicating that the chains have converged to a common distribution.
+
+**d. Create trace plots for each of the three chains.**
+
+```{r}
+traceplot(fit, pars = "pi")
+```
+
+
+**e. Create a density plot of the values for each of the three chains.**
+
+```{r}
+
+pi_samples <- rstan::extract(fit)$pi
+
+pi_samples_df <- as.data.frame(pi_samples)
+
+color_scheme_set("brightblue") 
+
+bayesplot::mcmc_areas(as.matrix(pi_samples_df), prob = 0.5, prob_outer = 0.9)
+
+posterior_samples <- as.array(fit)
+
+bayesplot::mcmc_dens_overlay(posterior_samples, pars = c("pi"))
+```
+The trace map demonstrates the convergence and mixing of the chains, while the density plots reveal that the posterior samples are consistently distributed throughout chains. The majority of the probability mass is clustered around the mean of π, as illustrated in the numerical summaries.
+
+**f. How do these approximations compare to the true posterior model of $\pi$? (Revisit Ch 3 if needed.)**
+
+In order to evaluate the accuracy of the estimated posterior model of π in a Bayesian Beta-Binomial model, we begin by examining the analytical solution of the posterior distribution. The posterior distribution of π, given the prior π∼Beta(α,β) and the probability from a binomial observation Y∣π∼Bin(n,π), is a Beta distribution with parameters α+Y and β+n−Y, denoted as π∣Y∼Beta(α+Y,β+n−Y).
+The real posterior distribution of π for the model, where n=10, Y=2, α=3, and β=8, is Beta(5,16).
+
+Comparative analysis with approximations
+Grid Approximation: The grid approximation, which involves dividing the interval between 0 and 1 into 201 evenly spaced values, allows for a numerical estimation of the actual posterior distribution. The accuracy of this method relies on the level of detail in the grid and the computational approach used to assess the density of the posterior at each place on the grid. By using a more precise grid, the approximation will closely approximate the actual posterior distribution.
+The main distinction lies in the fact that the actual posterior is characterized by continuity, whereas the grid approximation is discrete and contingent upon the selected grid points. However, by accumulating a sufficient number of points, it is possible to achieve a close visual and numerical approximation of the continuous distribution.
+
+MCMC sampling, specifically using RStan, is a method that generates samples from the posterior distribution without the necessity for analytical solutions. These samples can subsequently be utilized to estimate the features of the posterior distribution (such as the mean and variance) and to visually represent its form (for example, using density plots).
+MCMC offers a more accurate estimation of the continuous posterior distribution in comparison to grid approximation, particularly when a large number of iterations are performed and adequate convergence is achieved. The obtained samples can be utilized to approximate any statistical measure of the posterior distribution.
+
+Assessing the approximations:
+Visual examination: Visualizing the density of the MCMC samples and comparing it to the density of the genuine posterior distribution (Beta(5, 16)) can provide a visual assessment of the accuracy of the sampling approximation. Similarly, comparing the grid approximation findings with the genuine posterior can demonstrate the correctness of the approximation.
+
+
+Summary Statistics: By calculating summary statistics such as the mean, median, and credible intervals from the MCMC samples, we can quantitatively assess the accuracy of the approximation by comparing these values to the analytical values obtained from the Beta(5, 16) distribution.
+
+Diagnostic checks, such as R-hat and effective sample size, can be used to evaluate the accuracy of the MCMC method. These checks ensure that the chains have reached convergence and are successfully sampling from the posterior distribution.
+
+**2. Consider the Gamma-Poisson model for $\lambda$ with $Y_i|\lambda \sim \text{Pois}(\lambda)$ and $\lambda \sim \text{Gamma}(20, 5)$. Suppose you observe $n = 3$ independent data points $\left( Y_1, Y_2, Y_3 \right) = (0, 1, 0)$.**
+
+**a. Utilize grid approximation with grid values $\lambda \in \{ 0, 1, 2, ..., 8 \}$ to approximate the posterior model of $\lambda$.**
+
+```{r}
+lambda_grid_2a <- 0:8
+
+alpha_prior_2a <- 20
+beta_prior_2a <- 5
+
+observations_2a <- c(0, 1, 0)
+n_2a <- length(observations_2a)
+
+prior_pdf_2a <- dgamma(lambda_grid_2a, shape = alpha_prior_2a, rate = beta_prior_2a)
+
+likelihood_2a <- sapply(lambda_grid_2a, function(lam) {
+  prod(dpois(observations_2a, lam))
+})
+
+unnormalized_posterior_2a <- likelihood_2a * prior_pdf_2a
+
+normalized_posterior_2a <- unnormalized_posterior_2a / sum(unnormalized_posterior_2a)
+
+results_2a <- data.frame(lambda = lambda_grid_2a, Prior = prior_pdf_2a, 
+                      Likelihood = likelihood_2a, Unnormalized = unnormalized_posterior_2a, 
+                      Normalized = normalized_posterior_2a)
+
+print(results_2a)
+```
+
+The normalized posterior column indicates that the values of λ at 2 and 3 have the highest posterior probabilities. This suggests that, considering the observed data (0,1,0)(0,1,0) and the prior distribution Gamma(20, 5), the most probable values for λ are approximately 2 to 3. Based on the computations, the precise posterior probabilities for λ=2 and λ=3 are around 44.6% and 49.8%, respectively.
+Based on the obtained results, we may deduce that, considering the initial belief represented by the Gamma distribution and the collected data, the most probable value for λ lies within the lower range, specifically between 2 and 3. Additional values of λ within the grid have significantly lower posterior probabilities, suggesting that they are less congruent with both the prior information and the observed data.
+
+**b. Repeat part a using a grid of 201 equally spaced values between 0 and 8.**
+
+```{r}
+lambda_grid_2b <- seq(0, 8, length.out = 201)
+
+alpha_prior_2b <- 20
+beta_prior_2b <- 5
+
+observations_2b <- c(0, 1, 0)
+n_2b <- length(observations_2b)
+
+prior_pdf_2b <- dgamma(lambda_grid_2b, shape = alpha_prior_2b, rate = beta_prior_2b)
+
+likelihood_2b <- sapply(lambda_grid_2b, function(lam_2b) {
+  prod(dpois(observations_2b, lam_2b))
+})
+
+unnormalized_posterior_2b <- likelihood_2b * prior_pdf_2b
+
+normalized_posterior_2b <- unnormalized_posterior_2b / sum(unnormalized_posterior_2b)
+
+results_2b <- data.frame(Lambda = lambda_grid_2b, Prior = prior_pdf_2b, 
+                      Likelihood = likelihood_2b, Unnormalized = unnormalized_posterior_2b, 
+                      Normalized = normalized_posterior_2b)
+
+head(results_2b)
+```
+
+The posterior probability exhibits a rise from λ=0.04 to λ=0.20, and is likely to continue increasing for higher values of λ that are not depicted in this context. The normalized probability are exceedingly minuscule for the lowest λ values, indicating that these values are highly improbable based on the available data and the prior information.
+The probability is maximum at λ=0.20 for the given subset, which represents the Poisson probability of observing the data given that specific λ. However, due to our limited observation of the grid, we lack a comprehensive understanding of the precise location of the peak of the posterior distribution. The highest point in the normalized posterior probability distribution corresponds to the most probable value(s) of λ, considering both the data and previous information. To determine this, it is necessary to examine the complete spectrum of λ values, ranging from 0 to 8. This is particularly important because the Gamma(20, 5) prior indicates that higher λ values are more probable a priori.
+
+**c. Simulate the posterior model of $\lambda$ with RStan using 4 chains and 10000 iterations per chain.**
+
+```{r}
+stan_model_code_2c <- "
+data {
+  int<lower=0> n; // Number of observations
+  int<lower=0> y[n]; // Observations
+}
+
+parameters {
+  real<lower=0> lambda; // Rate parameter of the Poisson distribution
+}
+
+model {
+  lambda ~ gamma(20, 5); // Prior distribution for lambda
+  for (i in 1:n) {
+    y[i] ~ poisson(lambda); // Likelihood of observations
+  }
+}
+"
+
+stan_data <- list(
+  n = 3,  
+  y = c(0, 1, 0)  
+)
+
+fit <- stan(model_code = stan_model_code_2c,
+            data = stan_data,
+            chains = 4,
+            iter = 10000,
+            seed = 333)  
+
+print(fit)
+
+
+```
+
+The estimated average value of λ obtained from the posterior distribution is around 2.63.
+The posterior samples have a standard deviation (sd) of 0.58.
+The lower bound of the 95% credible interval, determined by the 2.5% percentile of the posterior distribution, is around 1.63. The upper bound, determined by the 97.5% percentile, is approximately 3.90.
+The value of λ is 7151, indicating a high level that implies the samples are informative and the chain has mixed effectively.
+The potential scale reduction factor is a measure of convergence in a MCMC algorithm. A Rhat value of 1 indicates that the chains have reached convergence.
+
+**d. Create trace plots for each of the four chains.**
+
+```{r}
+rstan::traceplot(fit, pars = "lambda")
+```
+
+
+**e. Create a density plot of the values for each of the four chains.**
+
+```{r}
+posterior_samples <- as.array(fit, pars = "lambda")
+
+
+bayesplot::mcmc_dens_overlay(posterior_samples, pars = "lambda")
+```
+
+
+**f. How do these approximations compare to the true posterior model of $\lambda$? (Revisit Ch 5 if needed.)**
+
+The grid approximation yielded greater probability for λ values in the range of 2 to 3, which aligns with the MCMC simulation findings where the average is approximately 2.63.
+The MCMC simulation provides a credible interval, ranging from around 1.63 to 3.90, which represents the likely values of λ, taking into account both the previous information and the observed data.
+Compared to the true posterior model, the true posterior of λ, given the seen data and the prior Gamma distribution, may be represented as another Gamma distribution. This is because the Poisson and Gamma distributions are conjugate pairs. The parameters of the posterior distribution are updated depending on the sum of the observed data and the previous parameters.
+The average value of the posterior distribution obtained from the RStan simulation seems to fall within a fair range, considering the update rules based on conjugate priors. The spread of the distribution, as indicated by the standard deviation and credible interval, represents the level of uncertainty after witnessing the data.
+Both the grid approximation, particularly with a more refined grid, and the RStan MCMC simulation offer valuable approximations of the genuine posterior. The MCMC results are expected to be more precise since they are derived from a greater number of samples and are based on a continuous approximation rather than a discrete one.
+
+**3. Consider the Normal-Normal model for $\mu$ with $Y_i | \mu \sim N(\mu, 1.3^2)$ and $\mu \sim N(10, 1.2^2)$. Suppose that with $n=4$ independent observations, you observe data $\left( Y_1, Y_2, Y_3, Y_4 \right) = (7.1, 8.9, 8.4, 8.6)$.**
+
+**a. Utilize grid approximation with grid values $\mu \in \{ 5, 6, 7, ..., 15 \}$ to approximate the posterior model of $\mu$.**
+
+```{r}
+observations_3a <- c(7.1, 8.9, 8.4, 8.6)
+mu_grid <- 5:15
+mu_0 <- 10
+tau <- 1.2
+sigma <- 1.3
+n_3a <- length(observations_3a)
+
+prior_pdf_3a <- dnorm(mu_grid, mean = mu_0, sd = tau)
+
+likelihood_3a <- sapply(mu_grid, function(mu) {
+  prod(dnorm(observations_3a, mean = mu, sd = sigma))
+})
+
+unnormalized_posterior_3a <- likelihood_3a * prior_pdf_3a
+
+normalized_posterior_3a <- unnormalized_posterior_3a / sum(unnormalized_posterior_3a)
+
+results_3a <- data.frame(Mu = mu_grid, Prior = prior_pdf_3a, 
+                      Likelihood = likelihood_3a, Unnormalized = unnormalized_posterior_3a, 
+                      Normalized = normalized_posterior_3a)
+print(results_3a)
+```
+The peak of the posterior distribution is observed at μ=9, with a normalized probability density of roughly 0.5779. Based on the available data and the previous distribution, it can be inferred that the most likely estimate for the population mean is μ=9, according to this approximation.
+
+Dissemination of the Posterior: The probabilities of the posterior drop as we deviate from the mean value of μ=9, in both the direction of higher and lower values of μ. The spread of this data indicates the level of uncertainty regarding the estimation of μ; a broader spread corresponds to a greater degree of uncertainty. Nevertheless, considering the significant decline in normalized probability as we deviate from 9, it implies that the data offer valuable insights that limit the range of probable possibilities for μ.
+
+Comparison with Previous and Probability: The probability and prior independently influence the formation of the posterior. For example, the probability is highest for values that are closer to the mean of the observed data, whereas the prior is centered at 10. The posterior distribution, obtained after normalization, arises from the trade-off between these two sources of information, mostly favoring the region suggested by the data (likelihood) while also being influenced by the prior belief.
+
+**b. Repeat part a using a grid of 201 equally spaced values between 5 and 15.**
+
+```{r}
+mu_grid_3b <- seq(5, 15, length.out = 201)
+
+mu_0_3b <- 10
+tau_3b <- 1.2
+sigma_3b <- 1.3
+observations_3b <- c(7.1, 8.9, 8.4, 8.6)
+
+prior_pdf_3b <- dnorm(mu_grid_3b, mean = mu_0_3b, sd = tau_3b)
+
+likelihood_3b <- sapply(mu_grid_3b, function(mu_3b) {
+  prod(dnorm(observations_3b, mean = mu_3b, sd = sigma_3b))
+})
+
+unnormalized_posterior_3b <- likelihood_3b * prior_pdf_3b
+
+normalized_posterior_3b <- unnormalized_posterior_3b / sum(unnormalized_posterior_3b)
+
+results_3b <- data.frame(Mu = mu_grid_3b, Prior = prior_pdf_3b, 
+                      Likelihood = likelihood_3b, Unnormalized = unnormalized_posterior_3b, 
+                      Normalized = normalized_posterior_3b)
+
+plot(results_3b$Mu, results_3b$Normalized, type='l', xlab="Mu", ylab="Normalized Posterior", main="Posterior Distribution of Mu")
+
+head(results_3b)
+```
+
+The graphic exhibits a Gaussian distribution with a mean value of μ, which aligns with both the observed data Y=(7.1,8.9,8.4,8.6) and the prior assumption that μ follows a normal distribution N(10,1.22). The graph indicates that the grid approximation has well represented the fundamental characteristics of the posterior distribution, as anticipated in a Normal-Normal conjugate model when the posterior is also normally distributed.
+The apex of the curve signifies the most likely value of μ based on the data and the preceding. The breadth of the curve corresponds to the level of uncertainty surrounding the value of μ: a narrower peak signifies reduced uncertainty and a more accurate estimation, whereas a larger peak implies greater uncertainty.
+
+**c. Simulate the posterior model of $\mu$ with RStan using 4 chains and 10000 iterations per chain.**
+
+```{r}
+stan_model_code_3c <- "
+data {
+  int<lower=0> n;               // Number of observations
+  vector[n] y;                  // Observations
+  real<lower=0> prior_mu;       // Prior mean for mu
+  real<lower=0> prior_sigma;    // Prior standard deviation for mu
+  real<lower=0> obs_sigma;      // Observation standard deviation
+}
+
+parameters {
+  real mu;                      // Parameter to estimate
+}
+
+model {
+  mu ~ normal(prior_mu, prior_sigma);  // Prior for mu
+  y ~ normal(mu, obs_sigma);           // Likelihood for observations
+}
+"
+
+stan_data <- list(
+  n = 4,
+  y = c(7.1, 8.9, 8.4, 8.6),
+  prior_mu = 10,
+  prior_sigma = 1.2,
+  obs_sigma = 1.3
+)
+
+fit <- stan(model_code = stan_model_code_3c, 
+            data = stan_data, 
+            chains = 4, 
+            iter = 10000, 
+            seed = 333) 
+
+print(fit)
+
+
+```
+
+
+**d. Create trace plots for each of the four chains.**
+
+```{r}
+traceplot(fit, pars = "mu")
+```
+
+**e. Create a density plot of the values for each of the four chains.**
+
+```{r}
+mu_samples_list <- lapply(1:4, function(chain_id) {
+  rstan::extract(fit, permuted = FALSE, inc_warmup = FALSE)[, chain_id, "mu"]
+})
+
+mu_samples_matrix <- do.call(cbind, mu_samples_list)
+
+mu_samples_df <- data.frame(samples = as.vector(mu_samples_matrix),
+                            chain = factor(rep(1:4, each = nrow(mu_samples_matrix))))
+
+ggplot(mu_samples_df, aes(x = samples, fill = chain)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Density plot of mu for each chain",
+       x = "mu samples",
+       y = "Density") +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+
+
+**f. How do these approximations compare to the true posterior model of $\mu$? (Revisit Ch 5 if needed.)**
+
+The prior mean μ0=10 and variance τ^2=1.22, the variance of the likelihood σ^2=1.32, and the observed sample mean is the average of the observed data.
+
+
+The posterior mean estimate is approximately 8.64.
+The posterior standard deviation estimate is 0.57.
+The 95% credible interval is between 7.52 and 9.76.
+The peak posterior probability is around the grid value of 9.
+
+If the RStan posterior mean of 8.64 closely approximates the genuine posterior mean, and the standard deviation of 0.57 closely approximates the square root of the true posterior variance, then it can be inferred that the MCMC simulation is correct.
+If the highest point of the grid approximation at 9 is in close proximity to the actual posterior mean, it suggests that the grid approximation is a valid discrete estimation of the posterior distribution.
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,363 @@
+---
+title: "STA6990: Project 2"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+```{r}
+library(bayesrules)
+library(tidyverse)
+library(rstan)
+library(bayesplot)
+library(broom.mixed)
+library(janitor)
+library(stats)
+library(bayesplot)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(janitor)
+library(tidyr)
+library(gridExtra)
+library(stats)
+library(base)
+library(zoo)
+library(patchwork)
+library(MASS)
+library(Matrix)
+library(DescTools)
+library(purrr)
+library(caret)
+library(boot)
+library(lattice)
+library(GGally)
+library(emmeans)
+library(modelr)
+library(broom)
+library(performance)
+library(FSA)
+library(car)
+library(RcppEigen)
+library(Rcpp)
+```
+
+
+**1. For each situation, find the appropriate credible interval using the "middle" approach.**
+
+**a. A 95% credible interval for $\pi$ with $\pi|y \sim \text{Beta}(4,5)$.**
+
+```{r}
+alpha <- 4
+beta <- 5
+
+quantiles <- qbeta(c(0.025, 0.975), shape1 = alpha, shape2 = beta)
+quantiles
+```
+
+The 95% credible interval for π, where π∣y∼Beta(4,5), using the "middle" approach is approximately:
+(0.157,0.755)
+This interval means that there is a 95% probability that the parameter π lies between 0.157 and 0.755, according to the posterior distribution Beta(4,5). 
+
+**b. A 60% credible interval for $\pi$ with $\pi|y \sim \text{Beta}(4,5)$.**
+
+```{r}
+alpha <- 4
+beta <- 5
+
+quantiles_60 <- qbeta(c(0.20, 0.80), shape1 = alpha, shape2 = beta)
+quantiles_60
+```
+The 60% credible interval for the parameter π, given that π∣y follows a Beta(4,5) distribution, was estimated to be around (0.3032, 0.5837).
+The interval indicates a 60% probability that the parameter π falls within the range of 0.3032 and 0.5837, as determined by the posterior distribution Beta(4,5). The credible interval in question is narrower than a 95% interval, reflecting a more precise estimate of the potential values of π. Nevertheless, there is a higher degree of ambiguity when it comes to excluding the actual value. Statistical intervals can involve a trade-off between broader intervals, which offer greater coverage for uncertainty, and narrower ranges, which provide better precision.
+
+**c. What do you notice going from a 95% to a 60% credible interval?**
+
+Reduced Range: 
+95% Confidence Interval: Approximately (0.157, 0.755)
+60% Confidence Interval: Approximately (0.303, 0.584)
+The 60% credible interval is significantly narrower than the 95% credible interval. The reason for this is that the 60% interval primarily centers around the median, disregarding the outside 20% tails on both sides, which consist of the more extreme values in the distribution.
+
+Central Concentration: 
+The 60% interval is centered around the median and mean of the distribution, which are often close together in a Beta distribution with symmetric or near-symmetric forms. This interval excludes values that are considered less probable, including both extremely high and low values, which are included in the 95% interval.
+
+Enhanced Accuracy with Greater Uncertainty:
+The 60% interval provides a more accurate estimation of the value of π by concentrating on the most likely area.
+Nevertheless, there is a higher level of uncertainty when it comes to omitting the actual value of the parameter. This is because there is a 40% probability that π is outside this interval, as contrast to a 5% probability with the 95% interval.
+
+Interpretation in environment: 
+The choice between a 60% and 95% interval is often contingent upon the specific decision-making environment. If a lower level of uncertainty is acceptable, such as in initial investigations or exploratory stages, a 60% interval may be more desirable.
+When the potential repercussions of not accurately estimating the true value are significant, using a 95% interval is more suitable. This is because it encompasses a wider range of possibilities and minimizes the danger of excluding important information.
+
+Influence of Prior Beliefs: 
+Both intervals demonstrate the impact of the prior distribution (specifically, Beta(4,5) in this instance), which represents a pre-existing view about the probable values of π before taking into account any evidence. The distribution of these intervals (with a greater emphasis on values closer to the average rather than the extremes) is a direct result of the selected Beta parameters.
+
+Shifting from a 95% to a 60% credible range effectively changes the focus from a wide, cautious estimation to a smaller, more confident estimation. This transition requires finding a middle ground between the desired accuracy of the estimation and the tolerable amount of uncertainty in order to avoid excluding the actual value of the parameter. 
+
+**d. A 99% credible interval for $\lambda$ with $\lambda|y \sim \text{Gamma}(1,8)$.**
+
+```{r}
+shape <- 1
+rate <- 8
+
+quantiles_99 <- qgamma(c(0.005, 0.995), shape = shape, rate = rate)
+quantiles_99
+
+```
+The 99% credible interval for λ with λ∣y∼Gamma(1,8) and found it to be approximately:
+(0.00063,0.6623).
+This interval indicates that there is a 99% probability that the parameter λ falls between 0.00063 and 0.6623, given the posterior distribution Gamma(1,8).
+
+Lower Bound of 0.00063 is in close proximity to zero, indicating that smaller values of λ are highly likely based on the shape and rate of the distribution. The Gamma distribution with a shape parameter of 1 exhibits an exponential decay, resulting in a significant and rapid increase in likelihood from zero onwards.
+The upper bound of 0.6623 indicates a rather moderate number. This suggests that although bigger values of λ are theoretically feasible, they become increasingly unlikely as λ increases. This is consistent with the anticipated behavior of an exponential decay, in which the probability density decreases as λ deviates from zero.
+
+**e. A 99% credible interval for $\lambda$ with $\lambda|y \sim \text{Gamma}(2,16)$.**
+
+```{r}
+shape <- 2
+rate <- 16
+
+quantiles_99_gamma2 <- qgamma(c(0.005, 0.995), shape = shape, rate = rate)
+quantiles_99_gamma2
+```
+The 99% credible interval for λ where λ∣y∼Gamma(2,16) and found it to be approximately:(0.00647,0.4644) This interval means there is a 99% probability that the parameter λ falls between 0.00647 and 0.4644, given the posterior distribution Gamma(2,16).
+
+The shape parameter (2) indicates that the distribution is representing the rate of events over two occurrences, causing the distribution to exhibit an earlier peak (immediately after zero) compared to a higher shape value.
+The rate parameter (16) adjusts the distribution in a way that the average event rate becomes 0.125, which is calculated as 2 divided by 16. This value represents the central tendency of the distribution, around which the majority of the distribution's mass is concentrated.
+
+Gamma distributions with shape parameters greater than 1 exhibit a right-skewed pattern, which is clearly reflected in the wide credible interval that extends more to the right of the mean than to the left.
+The interval (0.00647, 0.4644) provides evidence of a right-skewed distribution, characterized by a large tail on the right side. In such distributions, the probability decreases as the value of λ grows.
+
+**f. What do you notice when we double the hyperparameters?**
+```{r}
+shape1 <- 1
+rate1 <- 8
+
+shape2 <- 2
+rate2 <- 16
+
+quantiles_99_orig <- qgamma(c(0.005, 0.995), shape = shape1, rate = rate1)
+
+quantiles_99_doubled <- qgamma(c(0.005, 0.995), shape = shape2, rate = rate2)
+
+quantiles_99_orig
+quantiles_99_doubled
+```
+Original and Doubled Parameters: 
+Original Parameters: The gamma distribution with shape parameter 1 and scale parameter 8, within the interval (0.00063, 0.6623)
+Doubled Parameters: The gamma distribution with shape parameter 2 and scale parameter 16, inside the interval (0.00647, 0.4644).
+
+Observations and interpretations:
+
+Interval Narrowing: 
+The credible interval contracts from (0.00063, 0.6623) to (0.00647, 0.4644) when the parameters are doubled. The observed phenomenon demonstrates that as the shape parameter increases, along with a proportional increase in the rate, the distribution becomes more concentrated around its mean. Consequently, the range of values containing 99% of the probability mass becomes narrower.
+
+Shift Towards Zero: 
+Although the intervals become narrower, both intervals originate from values that are near zero, suggesting the intrinsically right-skewed characteristic of the Gamma distribution. The lower bound of the interval is significantly higher, indicating the greater concentration and the likelihood of λ being more frequently observed at slightly higher values due to the doubling of the rate parameter.
+
+Decreased Variability: 
+The reduction in the range of the credible interval (0.6623−0.00063=0.66167 vs 0.4644−0.00647=0.45793) when parameters are doubled indicates a decrease in the variability of λ values. This phenomenon is commonly observed in probability distributions such as the Gamma distribution, where the rate parameter (which appears in the denominator of the mean formula, μ=α/β) increases at a quicker rate compared to the shape parameter. As a result, the distribution becomes more sharply peaked.
+
+Calculation of Mean and Variance:
+The mean for Γ(1,8) is 0.125, which is equal to 1/8. Similarly, the mean for Γ(2,16) is also 0.125, which is equal to 2/16. The mean remains constant as the increase in the shape parameter α is directly proportional to the rise in the rate parameter β.
+The variance of Γ(1,8) decreases from 0.015625 to 0.0078125 for Γ(2,16), which is halved. This reduction in variance indicates less uncertainty and a narrower distribution around the mean.
+
+Practical Implications: 
+In real-world situations such as failure rate modeling, a narrower interval with a mean and rate that are proportionately scaled indicates greater precision in making forecasts and estimates. This precision is essential for assessing dependability in engineering.
+Statistical inference involves adjusting parameters to change the interval, which is crucial in Bayesian inference. In this approach, prior distributions, which are typically informed by or updated with observed data, impact posterior distributions and credible intervals.
+
+**g. A 95% credible interval for $\mu$ with $\mu|y \sim \text{N}(10, 2^2)$.**
+
+```{r}
+mean <- 10
+sd <- 2
+
+z <- qnorm(c(0.025, 0.975))
+
+interval_95 <- mean + z * sd
+interval_95
+```
+The 95% credible interval for μ where μ∣y∼N(10,22) and found it to be approximately:
+(6.08,13.92).
+This interval means there is a 95% probability that the parameter μ falls between 6.08 and 13.92, given the posterior distribution N(10,4) (with the standard deviation σ=2).
+
+The interval is symmetrically distributed around the mean of 10, which is characteristic of a normal distribution where the mean serves as the center of symmetry.
+Standard Deviation (2): The interval (6.08, 13.92) covers a distance of around 1.96 standard deviations from the mean in both directions, including the central 95% of the distribution's probability. This statement illustrates the characteristic of the normal distribution, which states that around 95% of the data is anticipated to fall within a range of 1.96 standard deviations from the mean, assuming genuine normality.
+
+The width of the interval is 13.92−6.08=7.84, which is exactly 2×1.96×σ=3.92×2. This width confirms the calculation based on the z-value for a 95% confidence interval in a normal distribution.
+
+The interval (6.08,13.92) suggests a high level of certainty about the location of μ being near 10 but allows for variability given by the spread (standard deviation of 2).
+
+**h. A 95% credible interval for $\mu$ with $\mu|y \sim \text{N}(-10, 2^2)$.**
+
+```{r}
+mean <- -10
+sd <- 2
+
+z <- qnorm(c(0.025, 0.975))
+
+interval_95_neg <- mean + z * sd
+interval_95_neg
+```
+The 95% credible interval for μ where μ∣y∼N(−10,22) and found it to be approximately:
+(−13.92,−6.08).
+This interval indicates that there is a 95% probability that the parameter μ falls between -13.92 and -6.08, given the posterior distribution N(−10,4) (with the standard deviation σ=2). 
+
+
+**i. What do you notice when we change the sign of the first hyperparameter?**
+
+From a normal distribution with a mean of 10 and a variance of 22, to a normal distribution with a mean of -10 and a variance of 22:
+The 95% credible interval for a normal distribution with a mean of 10 and a standard deviation of 22 is (6.08, 13.92).
+The 95% credible interval for a normal distribution with a mean of -10 and a standard deviation of 22 is (-13.92, -6.08).
+
+Observations: 
+
+Symmetric Shift: 
+The interval undergoes a symmetrical shift around the y-axis. The negation of the interval (6.08,13.92) is (-13.92,-6.08). This movement precisely reflects the reversal of the average value from +10 to -10, while keeping the spread unchanged (the standard deviation remains 2).
+
+Consistent Interval Width: 
+Both intervals have a constant width of 7.84, calculated as 13.92 - 6.08 and -6.08 - (-13.92). This indicates that the variability, or standard deviation, of the distribution remains unchanged. The width is exactly 2 times 1.96 times 2, which is the range of ±1.96 standard deviations around the mean for a 95% credible interval in a normal distribution.
+
+The impact of mean negation: 
+Negating the mean of a normal distribution does not alter the shape or spread (standard deviation) of the distribution. It just shifts the center (location) of the distribution. The characteristics of dispersion (variance) and tail behaviors (skewness, kurtosis) stay constant as they are influenced by the amount of the standard deviation, rather than the mean.
+
+Application Interpretation:
+When intervals are employed in hypothesis testing, reversing the sign of the mean would indicate testing under a hypothesis with the opposite sign. This is typically observed in situations where the focus is on studying directional impacts, such as the growth or reduction in measurements or scores.
+Practically speaking, whether we look at things like displacement, financial gains or losses, or temperature changes, a shift in the sign of the mean with the same magnitude indicates scenarios that are either entirely above or below a zero-point. These scenarios are same in absolute terms but differ in direction.
+
+
+**2. The loon is a species of bird common to the Ontario region of Canada. Let $\lambda$ denote the typical number of loons observed by a birdwatcher across a 100-hour observation period. To learn about $\gamma$, we'll utilize bird counts collected in $n$ different outings.**
+
+**a. Your prior understanding is that the typical rate of loon sightings is 2 per 100 hours with a standard deviation of 1 per 100 hours. Specify an apporpriate prior model for $\gamma$.**
+
+```{r}
+alpha <- 4
+beta <- 2
+
+lambda_values <- seq(0, 10, length.out = 100)
+
+density_values <- dgamma(lambda_values, shape = alpha, rate = beta)
+density_values
+
+plot(lambda_values, density_values, type = 'l', lwd = 2, col = 'blue',
+     main = 'Prior Distribution for Lambda (Gamma(4, 2))',
+     xlab = 'Rate of Loon Sightings per 100 Hours', ylab = 'Density')
+```
+
+
+**b. The `loons` data in the `bayesrules` package contains loon counts in different 100-hour observation periods. What is the average loon count per 100 hours?**
+
+```{r}
+str(loons)
+
+head(loons)
+
+average_loon_count <- mean(loons$count)  
+
+print(average_loon_count)
+```
+The average loon count per 100 hours is 2.944.
+
+**c. Simulate the posterior model of $\gamma$, the typical rate of loon sightings per observation period, with `rstan` using 4 chains and 10000 iterations per chain.**
+
+```{r}
+loon_model_code <- "
+data {
+  int<lower=0> n;        // number of data points
+  int<lower=0> counts[n];  // observed loon counts
+}
+
+parameters {
+  real<lower=0> lambda;  // rate parameter for the Poisson distribution
+}
+
+model {
+  lambda ~ gamma(4, 2);  // prior distribution for lambda
+
+  // likelihood of the data given lambda
+  for (i in 1:n) {
+    counts[i] ~ poisson(lambda);
+  }
+}
+"
+
+loon_model <- stan_model(model_code = loon_model_code)
+
+data("loons")  
+
+n <- nrow(loons)
+counts <- loons$count
+
+stan_data <- list(n = n, counts = counts)
+
+fit <- sampling(loon_model, data = stan_data, iter = 10000, chains = 4)
+
+print(fit)
+
+```
+
+The estimated posterior mean for λ is 2.85, with a standard deviation (sd) of 0.38. The 95% credible interval (CI) for λ ranges from 2.16 to 3.64. This suggests that, using the available data and the previous model, there is a 95% likelihood that the actual rate of loon sightings is within this specific range.
+The projected rate of loon sightings (λ=2.85) exceeds your prior mean (2), indicating that the observed data likely revealed a little greater sighting rate than initially anticipated. The credible interval offers a precise estimation of the range within which this rate is expected to lie, with a 95% confidence level, based on the available data and prior beliefs.
+
+**d. Produce and discuss trace plots, overlaid density plots, and autocorrelation plots for the four chains.**
+
+```{r}
+stan_trace(fit)
+
+posterior_samples <- extract(fit)$lambda
+
+summary(posterior_samples)
+
+hist(posterior_samples, breaks = 40, main = "Posterior distribution of Lambda",
+     xlab = "Lambda", col = "darkgray")
+
+color_scheme_set("brightblue")
+
+mcmc_trace(fit, pars = "lambda", n_warmup = 5000, inc_warmup = TRUE)
+
+mcmc_dens(fit, pars = "lambda")
+
+mcmc_areas(fit, pars = "lambda")
+
+
+```
+
+The chains are thoroughly combined and the posterior distribution exhibits a single peak and symmetrical shape. Based on the provided data and model, it may be inferred that the posterior estimates for λ are dependable. The precise numerical summaries, such as the mean, median, and bounds of the credible interval, provide detailed estimates of λ.
+
+**e. Use your simulation results to approximate a middle 95% credible interval for $\gamma$.**
+
+```{r}
+credible_interval_95 <- quantile(posterior_samples, probs = c(0.025, 0.975))
+
+print(credible_interval_95)
+```
+The middle 95% credible interval for γ, the typical rate of loon sightings per 100-hour observation period, is approximately:(2.16,3.64)
+
+**f. Use your simulation results to approximate the posterior probability that $\gamma < 1$.**
+
+```{r}
+posterior_prob <- mean(posterior_samples < 1)
+
+print(posterior_prob)
+```
+The simulation results indicate that the posterior probability of γ being less than 1 is 0. Given the available data and prior information, none of the samples generated by the Markov Chain Monte Carlo (MCMC) method in the posterior distribution had values below 1. To clarify, based on the posterior distribution, it is highly improbable that the actual rate of loon sightings, denoted as γ, would be lower than 1 sighting per 100-hour period of observation.
+
+Given that the 95% credible interval for γ is roughly between 2.16 and 3.64, it may be concluded that the value of 1 is not included within this range. The data indicates that all plausible values of γ are bigger than 1.
+
+**g. If you hypothesize that birdwatchers should anticipate a rate of less than 1 loon per observation period, what conclusion are you drawing? Explain why you drew that conclusion.**
+
+If one were to hypothesize that birdwatchers should expect a rate of less than 1 loon each observation session, the conclusion derived from the simulation results would indicate that this theory is not substantiated by the data. The reason is as follows:
+
+The posterior samples of γ, which represents the rate of loon sightings, suggest that there is a 0% chance of γ being smaller than 1, as indicated by the simulation.
+The 95% credible interval for γ, which represents the range of values that are considered plausible, is estimated to be between approximately 2.16 and 3.64 sightings per 100-hour observation period. This range is significantly higher than 1.
+Given that none of the posterior samples were below 1, it indicates that, taking into account the facts and prior beliefs, a rate of less than 1 loon per observation period is extremely unlikely.
+The posterior distribution allows us to revise our initial views based on fresh data using Bayesian inference. Based on the compelling facts, it is evident that the number of loons observed per period is consistently more than 1. Therefore, any hypothesis suggesting a rate lower than 1 contradicts the observable evidence.
+
+To summarize, the hypothesis stating that birdwatchers should anticipate fewer than 1 loon sighting per 100 hours of observation is disproven by both the posterior probability and the credible interval. As a result, this hypothesis is rejected in favor of the rate supported by the data, which indicates a higher frequency of loon sightings. This finding highlights the significance of matching theories with empirical data and employing Bayesian approaches to update our expectations and beliefs regarding natural occurrences, such as wildlife sightings.
+
+

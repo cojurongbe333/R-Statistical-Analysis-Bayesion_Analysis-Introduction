@@ -1,0 +1,406 @@
+---
+title: "STA6990: Week 7"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+```{r}
+library(glmnet)
+library(nnet)
+library(boot)
+library(fastDummies)
+library(haven)
+library(lindia)
+library(tidyverse)
+library(gsheet)
+library(DescTools)
+library(FSA)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(agricolae)
+library(gmodels)
+library(dplyr)
+library(car)
+library(readr)
+library(broom)
+library(modelr)
+library(performance)
+library(GGally)
+library(emmeans)
+library(visreg)
+library(see)
+library(patchwork)
+library(caret)
+```
+
+**1. Tune an appropriate Beta($\alpha, \beta$) prior model for each situation below.**
+
+**1a. Your friend tells you "I think that I have a 80% chance of getting a full night of sleep tonight, and I am pretty certain." When pressed further, they put their chances between 70% and 90%.**
+
+```{r}
+alpha_1a <- 80
+beta_1a <- 20
+
+mean <- alpha_1a / (alpha_1a + beta_1a)
+variance <- (alpha_1a * beta_1a) / ((alpha_1a + beta_1a)^2 * (alpha_1a + beta_1a + 1))
+
+ci_lower <- qbeta(0.1, alpha_1a, beta_1a)
+ci_upper <- qbeta(0.9, alpha_1a, beta_1a)
+
+print(paste("Mean:", mean))
+print(paste("Variance:", variance))
+print(paste("80% Confidence Interval: [", ci_lower, ",", ci_upper, "]"))
+
+pi_values <- seq(from = 0, to = 1, by = 0.01)
+
+density_values <- dbeta(pi_values, shape1 = alpha_1a, shape2 = beta_1a)
+
+data_frame <- data.frame(pi_values, density_values)
+
+ggplot(data_frame, aes(x = pi_values, y = density_values)) +
+  geom_line() +
+  labs(title = "Beta Distribution of Sleep Probability",
+       x = "Probability of Full Night's Sleep",
+       y = "Density") +
+  theme_minimal()
+```
+
+Since the mean is 0.8, we know that α/α+β = 0.8. To show a high degree of certainty within the 70% to 90% range, we should consider starting with larger values of α and β that maintain this ratio. With the goal of modeling a situation where there's an 80% chance of occurring (with high certainty, and a range of 70% to 90%), a suitable approach would be to use the mean and variance formulas for the Beta distribution to derive α and β. With α=80 and β=20, the Beta distribution is centered around a mean of 0.8, showing a high level of certainty about the event occurring. 
+
+**1b. A scientist has created a new test for a rare disease. They expect that it’s accurate 90% of the time with a variance of 0.08.**
+
+```{r}
+estimate_beta_parameters <- function(mean, variance) {
+  alpha_1b <- mean * 10
+  beta_1b <- (1 - mean) * 10
+  
+  calc_variance <- function(alpha_1b, beta_1b) {
+    return (alpha_1b * beta_1b) / ((alpha_1b + beta_1b)^2 * (alpha_1b + beta_1b + 1))}
+  
+  for (i in 1:1000) {
+    current_variance <- calc_variance(alpha_1b, beta_1b)
+    if (current_variance < variance) {
+      alpha_1b <- alpha_1b * 1.1
+      beta_1b <- beta_1b * 0.9}
+      else {
+      alpha_1b <- alpha_1b * 0.9
+      beta_1b <- beta_1b * 1.1}
+    if (abs(current_variance - variance) < 1e-6) {
+      break}}
+  
+  return(c(alpha_1b, beta_1b))}
+
+mean <- 0.9
+variance <- 0.08
+
+parameters <- estimate_beta_parameters(mean, variance)
+print(parameters)
+```
+
+**1c. Max loves to play the video game Animal Crossing. They tell you: "The probability that I play Animal Crossing in the morning is somewhere between 75% and 95%, but most likely around 85%."**
+
+```{r}
+alpha_1c <- 10
+beta_1c <- 2.588235294117647
+
+
+
+pi_values_1c <- seq(from = 0, to = 1, length.out = 101)
+
+density_values_1c <- dbeta(pi_values, shape1 = alpha_1c, shape2 = beta_1c)
+
+data_frame <- data.frame(Probability = pi_values_1c, Density = density_values_1c)
+
+ggplot(data_frame, aes(x = Probability, y = Density)) +
+  geom_line(color = "blue") +
+  labs(title = "Beta Distribution Modeling Max's Gaming Habit",
+       x = "Probability of Playing Animal Crossing in the Morning",
+       y = "Density") +
+  theme_minimal()
+
+quantiles <- qbeta(c(0.25, 0.75), shape1 = alpha_1c, shape2 = beta_1c)
+print(paste("25th percentile:", quantiles[1]))
+print(paste("75th percentile:", quantiles[2]))
+```
+
+**1d. The bakery in Easthampton, Massachusetts often runs out of croissants on Sundays. Ben guesses that by 10 a.m., there is a 30% chance they have run out, but is pretty unsure about that guess.**
+
+```{r}
+alpha_1d <- 3
+beta_1d <- 7
+
+mean <- alpha_1d / (alpha_1d + beta_1d)
+variance <- (alpha_1d * beta_1d) / ((alpha_1d + beta_1d)^2 * (alpha_1d + beta_1d + 1))
+
+cat("Mean:", mean, "\n")
+cat("Variance:", variance, "\n")
+
+probabilities <- seq(0, 1, by = 0.01)
+
+density <- dbeta(probabilities, alpha_1d, beta_1d)
+
+ggplot(data.frame(probabilities, density), aes(x = probabilities, y = density)) +
+  geom_line() +
+  labs(title = "Beta Distribution for Probability of Bakery Running Out of Croissants",
+       x = "Probability of Running Out by 10 a.m.",
+       y = "Density") +
+  theme_minimal()
+```
+
+**2. You want to specify a Beta prior for a situation in which you have no idea about some parameter, $\pi$. You think $\pi$ is equally likely to be anywhere between 0 and 1.**
+
+**2a. Specify and plot the appropriate Beta prior model.**
+
+```{r}
+alpha_2a <- 1
+beta_2a <- 1
+
+probabilities_2a <- seq(0, 1, length.out = 101)
+
+density <- dbeta(probabilities_2a, alpha_2a, beta_2a)
+
+ggplot(data.frame(probabilities, density), aes(x = probabilities, y = density)) +
+  geom_line() +
+  labs(title = "Uniform Beta Prior Distribution (Beta(1, 1))",
+       x = "Probability",
+       y = "Density") +
+  theme_minimal()
+```
+
+**2b. What is the mean of the Beta prior that you specified? Explain why that does or does not align with having no clue.**
+
+The formula for calculating the mean of a Beta distribution is μ=α/α+β. The mean is computed as follows for the Beta prior with α=1 and β=1:μ=1/1+1=1/2 = 0.5. The Beta(1,1) distribution's mean of 0.5, which denotes a uniform distribution throughout the interval [0,1], is in perfect accordance with the concept of possessing "no clue" or absolute uncertainty regarding the parameter π. This is highly consistent with the notion of uncertainty due to the fact that the mean value of π is precisely intermediate within the range of values that could exist. This indicates that there is no inherent bias towards assuming that π is closer to zero or one. The impartial distribution (Beta(1, 1)) effectively conveys that there is no preconceived notion or preference for any particular value within the range of the parameter by attributing equal probability to each potential value of π. You would want to convey this neutrality or lack of information precisely when you have no prior knowledge or bias regarding the probable value of the parameter.
+
+**3. What do you call a sweet carbonated drink: pop, soda, coke, or something else? Let $\pi$ be the proportion of U.S. residents that prefer the term "pop." Two different beverage salespeople from different regions of the country have different priors for $\pi$. The first salesperson works in North Dakota and specifies a Beta(8,2) prior. The second works in Louisiana and specifies a Beta(1,20) prior.**
+
+**3a. Plot the prior probability density function for both salespeople.**
+
+```{r}
+probabilities <- seq(0, 1, length.out = 100)
+
+density_nd <- dbeta(probabilities, shape1 = 8, shape2 = 2)  
+density_la <- dbeta(probabilities, shape1 = 1, shape2 = 20) 
+
+data_nd <- data.frame(Probability = probabilities, Density = density_nd, Region = "North Dakota")
+data_la <- data.frame(Probability = probabilities, Density = density_la, Region = "Louisiana")
+data <- rbind(data_nd, data_la)
+
+ggplot(data, aes(x = Probability, y = Density, color = Region)) +
+  geom_line() +
+  labs(title = "Prior Probability Density Functions for Salespeople",
+       x = "Proportion preferring 'pop'",
+       y = "Density") +
+  theme_minimal() +
+  scale_color_manual(values = c("North Dakota" = "blue", "Louisiana" = "red"))
+```
+
+
+**3b. Compare, in words, the salespeople's prior understandings about the proportion of U.S. residents that say "pop."**
+
+North Dakota Salesperson (Beta(8, 2)): The salesperson's prior, with α=8 and β=2, suggests a strong conviction that most U.S. people favor the term "pop." The distribution is positively skewed with a mode indicating that the most likely value of the fraction is much over 0.5. This indicates a comprehension or presumption that in their area, and possibly in comparable areas, "pop" is the prevailing term utilized. This distribution's form indicates a strong preference for "pop" among a large number of people, with the mode exceeding the mean (α/α+β = 0.8).
+
+The Louisiana salesperson's previous distribution, with parameters α=1 and β=20, suggests that only a small number of U.S. people use the phrase "pop." This distribution is skewed towards lower probabilities, with a peak around 0. This suggests that the term "pop" is not commonly used to refer to sweet carbonated beverages among the general U.S. public, at least according to this salesman. The salesperson's distribution suggests that it is improbable for a substantial section of the population to favor the term "pop," as the mode of the distribution is located at a minimal value above zero.
+
+The variation in salespeople's prior knowledge can be explained by geographical differences in the terminology used for carbonated beverages in the United States. The salesperson from North Dakota's background indicates a clear regional preference for the term "pop," which is likely influenced by the language usage in the Midwest and certain northern regions. The Louisiana salesperson's background suggests a language difference, presumably reflecting a location where terms like "soda," "coke," or other alternatives are more commonly used instead of "pop." Regional experiences and perceptions can greatly impact individuals' opinions about larger preferences and actions, as shown by this sharp discrepancy.
+
+**4. Suppose we collect data for Problem 3. If we poll 50 U.S. residents and 12 (24%) prefer the term "pop",**
+
+**4a. Specify the unique posterior of $\pi$ for both salespeople.**
+
+```{r}
+alpha_nd_post <- 20
+beta_nd_post <- 40
+alpha_la_post <- 13
+beta_la_post <- 58
+
+probabilities_4a <- seq(0, 1, length.out = 100)
+
+density_nd_post <- dbeta(probabilities_4a, alpha_nd_post, beta_nd_post)
+density_la_post <- dbeta(probabilities_4a, alpha_la_post, beta_la_post)
+
+data <- data.frame(
+  Probability = rep(probabilities_4a, 2),
+  Density = c(density_nd_post, density_la_post),
+  Region = factor(rep(c("North Dakota Posterior", "Louisiana Posterior"), each = 100))
+)
+
+ggplot(data, aes(x = Probability, y = Density, color = Region)) +
+  geom_line() +
+  labs(title = "Posterior Distributions for North Dakota and Louisiana Salespeople",
+       x = "Proportion preferring 'pop'",
+       y = "Density") +
+  scale_color_manual(values = c("North Dakota Posterior" = "blue", "Louisiana Posterior" = "red")) +
+  theme_minimal()
+```
+New α=αprior+number of successes
+New β=βprior+number of failures
+
+Number of successes (favoring "pop") = 12
+Number of failures (not favoring "pop") = 50 - 12 = 38
+
+For the North Dakota salesperson:
+Prior α=8, Prior β=2
+Posterior α=8+12=20
+Posterior β=2+38=40
+
+For the Louisiana salesperson:
+Prior α=1, Prior β=20
+Posterior α=1+12=13
+Posterior β=20+38=58
+
+**4b. Plot the prior pdf, likelihood function, and posterior pdf for both salespeople.**
+
+```{r}
+alpha_nd_prior <- 8
+beta_nd_prior <- 2
+alpha_la_prior <- 1
+beta_la_prior <- 20
+
+y <- 12
+n <- 50
+
+alpha_nd_post <- alpha_nd_prior + y
+beta_nd_post <- beta_nd_prior + n - y
+alpha_la_post <- alpha_la_prior + y
+beta_la_post <- beta_la_prior + n - y
+
+pi_seq <- seq(0, 1, length.out = 100)
+
+likelihood <- dbinom(y, n, pi_seq)
+
+prior_nd <- dbeta(pi_seq, alpha_nd_prior, beta_nd_prior)
+prior_la <- dbeta(pi_seq, alpha_la_prior, beta_la_prior)
+posterior_nd <- dbeta(pi_seq, alpha_nd_post, beta_nd_post)
+posterior_la <- dbeta(pi_seq, alpha_la_post, beta_la_post)
+
+df <- tibble(pi = pi_seq, 
+             PriorND = prior_nd, 
+             PriorLA = prior_la, 
+             PosteriorND = posterior_nd, 
+             PosteriorLA = posterior_la, 
+             Likelihood = likelihood / max(likelihood))  
+
+ggplot(df, aes(x = pi)) +
+  geom_line(aes(y = PriorND, color = "Prior ND")) +
+  geom_line(aes(y = PriorLA, color = "Prior LA")) +
+  geom_line(aes(y = PosteriorND, color = "Posterior ND")) +
+  geom_line(aes(y = PosteriorLA, color = "Posterior LA")) +
+  geom_line(aes(y = Likelihood, color = "Likelihood"), linetype = "dashed") +
+  labs(title = "Prior, Likelihood, and Posterior Distributions",
+       x = "Proportion preferring 'pop'",
+       y = "Density / Relative Likelihood") +
+  scale_color_manual(values = c("Prior ND" = "blue", "Prior LA" = "red",
+                                 "Posterior ND" = "yellow", "Posterior LA" = "orange",
+                                 "Likelihood" = "green")) +
+  theme_minimal()
+```
+
+1.	Prior PDF: For the North Dakota salesperson, the prior is Beta(8, 2), and for the Louisiana salesperson, it's Beta(1, 20).
+2.	Likelihood Function: The likelihood of observing the data given π can be represented by the binomial distribution, Binomial(y∣n,π), where y=12 successes (preference for "pop") out of n=50 trials.
+3.	Posterior PDF: The posterior distribution combines the prior belief with the evidence from the data. Given the conjugate nature of the Beta and Binomial distributions, the posterior distribution for π is also a Beta distribution, where the new parameters are αposterior=αprior+y and βposterior=βprior+n−y.
+
+**4c. Compare the salespeople's posterior understanding of $\pi$.**
+
+The posterior distribution for the North Dakota salesman, with parameters α=20 and β=40, indicates a more tempered perspective than their initial assumption. The salesman initially had a significant preference for a bigger proportion of "pop" based on the Beta(8, 2) distribution, which is a frequent belief in locations where "pop" is the dominant term. Their modified belief (posterior) shifts to acknowledge a reduced liking for "pop" after noting that only 24% of the questioned sample favored it. The distribution remains optimistic about "pop" but recognizes the facts provided by the statistics.
+The posterior distribution for the Louisiana salesman alters dramatically from their initial pessimistic prior opinion. The updated posterior parameters (α=13 and β=58) indicate a shift towards a more accepting stance on the preference for "pop" within the population based on the observed data. This result nevertheless shows a strong inclination towards a reduced liking for "pop" music in general, in line with the anticipated trend in areas where "pop" music is not as popular.
+
+The North Dakota salesperson's attitude towards "pop" is less favorable than expected based on their area experience, but still more positive than the Louisiana salesperson's attitude.
+The Louisiana salesperson's behavior indicates a minor inclination towards favoring "pop" more than previously thought, but it still indicates that the term "pop" is not commonly used.Both posterior distributions have shifted towards the data, but their interpretation of the results remains aligned with their respective prior beliefs. The North Dakota salesperson's attitude towards the term "pop" remains optimistic, although less prevalent than before. On the other hand, the Louisiana salesperson's attitude towards the increased use of "pop" is somewhat negative.
+
+**5. A university wants to know what proportion of students are regular bike riders, $\pi$, so that they can install an appropriate number of bike racks. Since the university is in sunny Southern California, staff think that $\pi$ has a mean of 1/4 students, and a mode of 5/22.**
+
+**5a. Specify and plot a Beta model that reflects the staff’s prior ideas about $\pi$.**
+
+```{r}
+
+alpha_5a <- 2
+beta_5a <- 6
+
+probabilities_5a <- seq(0, 1, length.out = 100)
+
+density_5a <- dbeta(probabilities_5a, alpha_5a, beta_5a)
+
+ggplot(data.frame(probabilities_5a, density_5a), aes(x = probabilities_5a, y = density_5a)) +
+  geom_line() +
+  labs(title = "Approximate Beta Distribution for University Staff's Prior",
+       x = "Proportion of Regular Bike Riders (π)",
+       y = "Density") +
+  theme_minimal()
+```
+We may establish two equations using the given mean of 1/4 and mode of 5/22 to determine the values of α and β. Directly calculating these equations may be complex and necessitate numerical approaches. Let's analyze the properties of the Beta distribution to see if they align with these criteria.
+A Beta distribution with a mode less than the mean is right-skewed, where α<β. To discover precise values for α and β that fulfill both the mean and mode exactly, one must solve the equations resulting from the mean and mode formulas, considering the limitations supplied.
+
+**5b. Among 50 surveyed students, 15 are regular bike riders. What is the posterior model for $\pi$?**
+
+```{r}
+alpha_posterior_5b <- 17
+beta_posterior_5b <- 41
+
+probabilities_5b <- seq(0, 1, length.out = 100)
+
+density_posterior_5b <- dbeta(probabilities_5b, alpha_posterior_5b, beta_posterior_5b)
+
+ggplot(data.frame(probabilities_5b, density_posterior_5b), aes(x = probabilities_5b, y = density_posterior_5b)) +
+  geom_line() +
+  labs(title = "Posterior Beta Distribution for Proportion of Regular Bike Riders",
+       x = "Proportion of Regular Bike Riders (π)",
+       y = "Density") +
+  theme_minimal()
+```
+Given a prior distribution of Beta(α, β) and a dataset of y successes (regular bike riders) out of n trials (surveyed students), the following is observed:
+Posterior α=αprior+y
+Posterior beta equals preceding beta plus beta.(n - y)
+
+With an approximate prior of αprior≈2 and βprior≈6, the data indicates that out of n=50 students, there are y=15 regular bike riders.
+Posterior α = 17
+The posterior β is calculated as 6 plus the difference between 50 and 15, resulting in 41.
+The posterior distribution for π, representing the revised belief following the survey data, is Beta(17, 41).
+
+**5c. What is the mean, mode, and standard deviation of the posterior model?**
+
+```{r}
+alpha_posterior_5c <- 17
+beta_posterior_5c <- 41
+
+mean_posterior_5c <- alpha_posterior_5c / (alpha_posterior_5c + beta_posterior_5c)
+
+mode_posterior_5c <- (alpha_posterior_5c - 1) / (alpha_posterior_5c + beta_posterior_5c - 2)
+
+std_dev_posterior <- sqrt((alpha_posterior_5c * beta_posterior_5c) / 
+                          ((alpha_posterior_5c + beta_posterior_5c)^2 * 
+                           (alpha_posterior_5c + beta_posterior_5c + 1)))
+
+cat("Mean of the posterior distribution:", mean_posterior_5c, "\n")
+cat("Mode of the posterior distribution:", mode_posterior_5c, "\n")
+cat("Standard deviation of the posterior distribution:", std_dev_posterior, "\n")
+```
+
+**5d. Does the posterior model more closely reflect the prior information or the data? Explain your reasoning.**
+
+The Beta(17, 41) distribution represents the posterior model, which combines prior beliefs with observable facts. We assess whether the posterior parameters are more influenced by the previous information or the data.
+
+The staff's original assumption was represented by a Beta distribution with a mean of 1/4 (0.25) and a mode of 5/22, suggesting that they believed a quarter of the students were frequent bike riders. The specific prior parameters were not quantitatively defined before to data analysis but were meant to represent these beliefs.
+
+Observed Data: Out of 50 polled students, 15, or 30%, are regular bike riders. This data point directly influences the posterior by modifying the prior parameters according to the quantity of observed successes (regular bike riders) and failures.
+
+Posterior Parameters: Given α=17 and β=41, the posterior mean is around 0.293 (or 29.3%), slightly above the prior mean of 0.25. The posterior mean is more nearer to the observed proportion of 0.30 (30%) derived from the survey data. The standard deviation of the posterior distribution reflects the level of uncertainty around the mean, which is comparatively small, indicating higher confidence compared to a wider initial belief.
+
+The posterior model better represents the data than the prior information due to the factors mentioned.
+
+The posterior mean (0.293) is closer to the observed data fraction (0.30) than to the prior mean (0.25), suggesting that the data had a substantial influence on adjusting the belief.
+The posterior distribution includes the previous belief but its properties (mean, mode) have been notably shifted towards the observed data. The modification indicates that while the initial belief had an impact on the analysis's starting point, the observed data had a greater influence on the final model.
+
+The reduced standard deviation of the posterior distribution relative to a broad prior suggests that the data played a substantial role in reducing uncertainty about π.
+
+
+
+
+
+

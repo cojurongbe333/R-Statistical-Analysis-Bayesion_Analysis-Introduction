@@ -1,0 +1,120 @@
+---
+title: "STA6990: Week 2"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+
+**1. You drive to work 20 days, keeping track of the commuting time (in minutes) for each trip. Here are the twenty measurements.**
+
+<center>
+25.4, 27.8, 26.8, 24.1, 24.5, <br>
+23.0, 27.5, 24.3, 28.4, 29.0, <br>
+29.4, 24.9, 26.3, 23.5, 28.3, <br>
+27.8, 29.4, 25.7, 24.3, 24.2 
+</center>
+<br>
+**a. Approximate the probability that it takes you under 25 minutes to drive to work.**
+```{r}
+commute_times <- c(25.4, 27.8, 26.8, 24.1, 24.5, 23.0, 27.5, 24.3, 28.4, 29.0, 
+                   29.4, 24.9, 26.3, 23.5, 28.3, 27.8, 29.4, 25.7, 24.3, 24.2)
+
+days_under_25 <- sum(commute_times < 25)
+total_days <- length(commute_times)
+probability_under_25 <- days_under_25 / total_days
+probability_under_25
+```
+The probability that it takes you under 25 minutes to drive to work is 40%.
+
+**b. Approximate the probability it takes between 25 and 28 minutes to drive to work.**
+```{r}
+commute_times <- c(25.4, 27.8, 26.8, 24.1, 24.5, 23.0, 27.5, 24.3, 28.4, 29.0, 
+                   29.4, 24.9, 26.3, 23.5, 28.3, 27.8, 29.4, 25.7, 24.3, 24.2)
+
+days_between_25_and_28 <- sum(commute_times >= 25 & commute_times <= 28)
+total_days <- length(commute_times)
+probability_between_25_and_28 <- days_between_25_and_28 / total_days
+probability_between_25_and_28
+```
+The probability it takes between 25 and 28 minutes to drive to work is 35%
+
+**c. Suppose one day it takes you 23 minutes to get to work. Would you consider this unusual? Why?**
+```{r}
+commute_times <- c(25.4, 27.8, 26.8, 24.1, 24.5, 23.0, 27.5, 24.3, 28.4, 29.0, 
+                   29.4, 24.9, 26.3, 23.5, 28.3, 27.8, 29.4, 25.7, 24.3, 24.2)
+
+mean_time <- mean(commute_times)
+std_deviation <- sd(commute_times)
+
+mean_time
+std_deviation
+```
+We can tell whether a 23-minute commute is within two standard deviations of the mean. If it is, it's not unusual; if it's not, then it might be considered unusual. We look at the range defined by the mean plus or minus two standard deviations. This range covers approximately 95% of the data in a normal distribution. Range:
+
+Lower bound = Mean - 2 * Standard Deviation
+Upper bound = Mean + 2 * Standard Deviation
+Lower bound = 26.23 - 2 * 2.09463
+Upper bound = 26.23 + 2 * 2.09463
+
+The range, based on two standard deviations from the mean, is approximately 22.04 to 30.42 minutes. Since a 23-minute commute falls within this range, it would not be considered unusual based on your commuting data.
+
+**2. Suppose you roll three fair dice.**
+
+**a. How many possible outcomes are there?**
+
+The total number of possible outcomes when rolling three fair dice is 216.
+
+**b. Find the probability you roll three fives.**
+```{r}
+favorable_outcomes <- 1
+total_outcomes <- 6^3
+probability_rolling_fives <- favorable_outcomes / total_outcomes
+probability_rolling_fives
+```
+The probability you roll three fives is 0.46%.
+
+**c. Find the probability that all three dice show the same number.**
+```{r}
+favorable_outcomes <- 6  
+total_outcomes <- 6^3
+probability_same_number <- favorable_outcomes / total_outcomes
+probability_same_number
+```
+The probability that all three dice show the same number is 2.78%
+
+**d. Find the probability that the sum of the dice is equal to 10.**
+```{r}
+favorable_outcomes <- 0
+
+for(die1 in 1:6) {
+  for(die2 in 1:6) {
+    for(die3 in 1:6) {
+      if(die1 + die2 + die3 == 10) {
+        favorable_outcomes <- favorable_outcomes + 1}}}}
+
+total_outcomes <- 6^3
+probability_sum_10 <- favorable_outcomes / total_outcomes
+probability_sum_10
+```
+The probability that the sum of the dice is equal to 10 is 12.5%.
+
+**3. CHALLENGE. The built-in vector, `letters` contains the 26 lower-case letters of the alphabet.**
+
+**a. Using the `sample()` function, take a sample of 10 letters without replacement from `letters`.**
+```{r}
+sampled_letters <- sample(letters, 10, replace = FALSE)
+sampled_letters
+```
+
+**b. Using the `sample()` function, take a sample of 10 letters with replacement from `letters`.**
+```{r}
+sampled_letters_with_replacement <- sample(letters, 10, replace = TRUE)
+sampled_letters_with_replacement
+```
+

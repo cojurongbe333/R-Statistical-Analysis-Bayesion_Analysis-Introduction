@@ -1,0 +1,326 @@
+---
+title: "STA6990: Week 9"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+```{r no_show}
+library(glmnet)
+library(nnet)
+library(boot)
+library(fastDummies)
+library(haven)
+library(lindia)
+library(tidyverse)
+library(gsheet)
+library(DescTools)
+library(FSA)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(agricolae)
+library(gmodels)
+library(dplyr)
+library(car)
+library(readr)
+library(broom)
+library(modelr)
+library(performance)
+library(GGally)
+library(emmeans)
+library(visreg)
+library(see)
+library(patchwork)
+library(caret)
+```
+
+**1. Assume a prior model of $\lambda \sim \text{Gamma}(24, 2)$. Suppose we have several situations where we have observed a random sample of Poisson variables, $Y_i|\lambda \overset{ind}\sim \text{Pois}(\lambda)$. Find the corresponding posteriors:**
+
+**1a. $(y_1, y_2, y_3) = (3, 7, 19)$**
+
+```{r}
+alpha_prior1a <- 24
+beta_prior1a <- 2
+
+y_1a <- c(3, 7, 19)
+
+alpha_posterior1a <- alpha_prior1a + sum(y_1a)
+beta_posterior1a <- beta_prior1a + length(y_1a)
+
+cat("Posterior shape (alpha'):", alpha_posterior1a, "\n")
+cat("Posterior rate (beta'):", beta_posterior1a, "\n")
+```
+
+**1b. $(y_1, y_2, y_3, y_r) = (12, 12, 12, 0)$**
+
+```{r}
+alpha_prior1b <- 24
+beta_prior1b <- 2
+
+y_1b <- c(12, 12, 12, 0)
+
+alpha_posterior1b <- alpha_prior1b + sum(y_1b)
+beta_posterior1b <- beta_prior1b + length(y_1b)
+
+cat("New Posterior shape (alpha'):", alpha_posterior1b, "\n")
+cat("New Posterior rate (beta'):", beta_posterior1b, "\n")
+```
+
+**1c. $y_1 = 12$**
+
+```{r}
+alpha_prior1c <- 24
+beta_prior1c <- 2
+
+y_1c <- 12
+
+alpha_posterior1c <- alpha_prior1c + y_1c
+beta_posterior1c <- beta_prior1c + 1  
+
+cat("Posterior shape (alpha') for single observation:", alpha_posterior1c, "\n")
+cat("Posterior rate (beta') for single observation:", beta_posterior1c, "\n")
+```
+
+**1d. $(y_1, y_2, y_3, y_4, y_5) = (16, 10, 17, 11, 11)$**
+
+```{r}
+alpha_prior1d <- 24
+beta_prior1d <- 2
+
+y_1d <- c(16, 10, 17, 11, 11)
+
+alpha_posterior1d <- alpha_prior1d + sum(y_1d)
+beta_posterior1d <- beta_prior1d + length(y_1d)
+
+cat("Posterior shape (alpha') for observations:", alpha_posterior1d, "\n")
+cat("Posterior rate (beta') for observations:", beta_posterior1d, "\n")
+```
+
+**2. Assume a prior model of $\lambda \sim \text{Gamma}(2, 2)$. Suppose we have several situations where we have observed a random sample of Poisson variables, $Y_i|\lambda \overset{ind}\sim \text{Pois}(\lambda)$. Find the corresponding posteriors:**
+
+**2a. $(y_1, y_2, y_3) = (3, 7, 19)$**
+
+```{r}
+alpha_prior_new2a <- 2
+beta_prior_new2a <- 2
+
+y_new2a <- c(3, 7, 19)
+
+alpha_posterior_new2a <- alpha_prior_new2a + sum(y_new2a)
+beta_posterior_new2a <- beta_prior_new2a + length(y_new2a)
+
+cat("Posterior shape (alpha'):", alpha_posterior_new2a, "\n")
+cat("Posterior rate (beta'):", beta_posterior_new2a, "\n")
+```
+
+**2b. $(y_1, y_2, y_3, y_r) = (12, 12, 12, 0)$**
+
+```{r}
+alpha_prior_new2b <- 2
+beta_prior_new2b <- 2
+
+y_new2b <- c(12, 12, 12, 0)
+
+alpha_posterior_new2b <- alpha_prior_new2b + sum(y_new2b)
+beta_posterior_new2b <- beta_prior_new2b + length(y_new2b)
+
+cat("Posterior shape (alpha') for new observations:", alpha_posterior_new2b, "\n")
+cat("Posterior rate (beta') for new observations:", beta_posterior_new2b, "\n")
+```
+
+**2c. $y_1 = 12$**
+
+```{r}
+alpha_prior_single2c <- 2
+beta_prior_single2c <- 2
+
+y_single2c <- 12
+
+alpha_posterior_single2c <- alpha_prior_single2c + y_single2c
+beta_posterior_single2c <- beta_prior_single2c + 1 
+
+cat("Posterior shape (alpha') for single observation:", alpha_posterior_single2c, "\n")
+cat("Posterior rate (beta') for single observation:", beta_posterior_single2c, "\n")
+```
+
+**2d. $(y_1, y_2, y_3, y_4, y_5) = (16, 10, 17, 11, 11)$**
+
+```{r}
+alpha_prior_new2d <- 2
+beta_prior_new2d <- 2
+
+y_obs2d <- c(16, 10, 17, 11, 11)
+
+alpha_posterior_obs2d <- alpha_prior_new2d + sum(y_obs2d)
+beta_posterior_obs2d <- beta_prior_new2d + length(y_obs2d)
+
+cat("Posterior shape (alpha') for observations:", alpha_posterior_obs2d, "\n")
+cat("Posterior rate (beta') for observations:", beta_posterior_obs2d, "\n")
+```
+
+**3. Let random variable $\lambda$ represent the rate of text messages people receive in an hour. Let's say that we believe the typical number of messages per hour is 5 with a standard deviation of 0.25 messages.**
+
+**3a. Tune and plot an appropriate $\text{Gamma}(s, r)$ prior model for $\theta$.**
+
+```{r}
+s_3a <- 400
+r_3a <- 80
+
+lambda_values <- seq(0, 10, length.out = 1000)
+
+gamma_density <- dgamma(lambda_values, shape = s_3a, rate = r_3a)
+
+gamma_plot <- ggplot(data.frame(lambda_values, gamma_density), aes(x = lambda_values, y = gamma_density)) +
+  geom_line() + 
+  theme_minimal() +
+  labs(title = "Gamma(s = 400, r = 80) Prior Distribution",
+       x = "Rate of text messages (lambda)",
+       y = "Density")
+
+print(gamma_plot)
+```
+To model λ, the rate of text messages people receive in an hour, with a Gamma distribution Gamma(s,r) and match the given mean and standard deviation (mean = 5, standard deviation = 0.25), we need to find appropriate values for s (shape parameter) and r (rate parameter).
+The mean and variance of a Gamma distribution are given by:
+•	Mean = s/r
+•	Variance = s/ r^2
+Given the mean (μ) and standard deviation (σ), we can solve for s and r using:
+•	μ=s/r
+•	σ^2=s/ r^2
+From these equations, we get:
+•	s=μ^2/ σ^2
+•	r=μ/ σ^2
+The calculated parameters for the Gamma distribution that match the given mean of 5 and a standard deviation of 0.25 are s=400 (shape parameter) and r=80 (rate parameter). Thus, the appropriate prior model for λ is Gamma(400,80).
+
+
+**3b. What is the prior probability that the rate of text messages per hour is larger than 10? Hint: `pgamma()`.**
+
+```{r}
+s_3b <- 400
+r_3b <- 80
+
+prob_lambda_gt_10 <- 1 - pgamma(10, shape = s_3b, rate = r_3b)
+
+cat("The prior probability that the rate of text messages per hour is larger than 10 is:", prob_lambda_gt_10, "\n")
+```
+The probability of λ>10, we need to calculate 1−PGamma(10;400,80), which gives us the probability of λ being larger than 10.
+
+**4. Suppose we collect data from six friends. They received 7, 3, 8, 9, 10, 12 text messages in the previous hour.**
+
+**4a. Plot the resulting likelihood function of $\lambda$.**
+
+```{r}
+data4a <- c(7, 3, 8, 9, 10, 12)
+
+lambda_values <- seq(0.1, 20, length.out = 1000)
+
+log_likelihood <- function(lambda) {
+  sapply(lambda, function(l) sum(dpois(data4a, l, log = TRUE)))}
+
+log_likelihood_values <- log_likelihood(lambda_values)
+
+log_likelihood_values <- log_likelihood_values - max(log_likelihood_values)
+
+ggplot(data.frame(lambda = lambda_values, logLikelihood = log_likelihood_values), aes(x = lambda, y = logLikelihood)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Log-Likelihood Function of Lambda",
+       x = "Lambda (rate of text messages per hour)",
+       y = "Normalized Log-Likelihood")
+```
+To plot the likelihood function of λ given the observed data (7, 3, 8, 9, 10, 12 text messages), we first need to understand that the likelihood function for λ when the data follow a Poisson distribution is proportional to the product of the individual Poisson probabilities for each observation. For a set of independent observations y1,y2,…,yn from a Poisson(λ) distribution, the likelihood function L(λ) is given by:
+L(λ)=i=1∏n e^−λλ^yi/yi!
+For plotting purposes, it's more practical to plot the log-likelihood, which turns the product into a sum and simplifies the computation:
+logL(λ)=i=1∑n(−λ+yilog(λ)−log(yi!))
+We won't compute the factorial term log(yi!) since it's constant with respect to λ, and doesn't affect the shape of the likelihood function. 
+
+
+**4b. Plot the prior pdf, likelihood function, and the posterior pdf of $\lambda$.**
+
+```{r}
+s_prior4b <- 400
+r_prior4b <- 80
+
+data4b <- c(7, 3, 8, 9, 10, 12)
+
+s_posterior4b <- s_prior4b + sum(data4b)
+r_posterior4b <- r_prior4b + length(data4b)
+
+lambda_values <- seq(0, 20, length.out = 1000)
+
+prior_pdf <- dgamma(lambda_values, shape = s_prior4b, rate = r_prior4b)
+
+log_likelihood <- sapply(lambda_values, function(l) sum(dpois(data4b, l, log = TRUE)))
+likelihood <- exp(log_likelihood - max(log_likelihood))
+
+posterior_pdf <- dgamma(lambda_values, shape = s_posterior4b, rate = r_posterior4b)
+
+plot_data <- data.frame(lambda = lambda_values,
+                        Prior = prior_pdf,
+                        Likelihood = likelihood,
+                        Posterior = posterior_pdf)
+
+plot_data_melted <- plot_data %>%
+  pivot_longer(cols = c("Prior", "Likelihood", "Posterior"), names_to = "Distribution", values_to = "Density")
+
+ggplot(plot_data_melted, aes(x = lambda, y = Density, color = Distribution)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Prior, Likelihood, and Posterior Distributions of Lambda",
+       x = "Lambda (rate of text messages per hour)",
+       y = "Density") +
+  scale_color_manual(values = c("Prior" = "blue", "Likelihood" = "red", "Posterior" = "green"))
+```
+To plot the prior probability density function (PDF), the likelihood function, and the posterior PDF of λ, we will need to:
+
+Define the prior PDF using the Gamma(400,80) distribution, as previously calculated. Calculate the likelihood function based on the observed data (7, 3, 8, 9, 10, 12 text messages). Determine the posterior PDF, which, given a Gamma prior and Poisson likelihood, is also Gamma distributed. The posterior parameters are updated based on the prior parameters and the observed data.
+
+**4c. Use `summarize_gamma_poisson()` to calculate descriptive statistics for the prior and posterior models of $\lambda$.**
+
+```{r}
+summarize_gamma_poisson <- function(s, r) 
+  {mean <- s / r
+  variance <- s / (r^2)
+  sd <- sqrt(variance)
+  ci_lower <- qgamma(0.025, shape = s, rate = r)
+  ci_upper <- qgamma(0.975, shape = s, rate = r)
+  
+  return(list(mean = mean, 
+              variance = variance, 
+              standard_deviation = sd, 
+              ci_2.5 = ci_lower, 
+              ci_97.5 = ci_upper))}
+
+s_prior4c <- 400
+r_prior4c <- 80
+
+prior_stats <- summarize_gamma_poisson(s_prior4c, r_prior4c)
+print("Prior Model Statistics:")
+print(prior_stats)
+
+data4c <- c(7, 3, 8, 9, 10, 12)
+
+s_posterior4c <- s_prior4c + sum(data4c)
+r_posterior4c <- r_prior4c + length(data4c)
+
+posterior_stats <- summarize_gamma_poisson(s_posterior4c, r_posterior4c)
+print("Posterior Model Statistics:")
+print(posterior_stats)
+```
+
+**4d. Describe how your belief about $\lambda$ changed when changing from the prior in Q3 to the posterior based on the data collected from friends.**
+
+The previous λ model, utilizing a Gamma(400,80) distribution, indicated an average text message rate of 5 per hour. This was our first belief derived from prior knowledge or assumptions. Upon analyzing the data (consisting of 7, 3, 8, 9, 10, and 12 text messages), the posterior distribution adjusts the mean to accurately represent the observed data. The mean of the posterior Gamma distribution tends to move towards the average of the observed data, suggesting a revised notion that the rate at which people get text messages may be different from the initial assumption.
+The posterior distribution generally exhibits lower variance and standard deviation compared to the previous distribution, indicating a decrease in uncertainty regarding λ following the inclusion of the observed data. The inclusion of extra data is beneficial since it offers supplementary information, hence assisting in the reduction of the potential range of feasible values for λ.
+The 95% credible interval of the posterior distribution represents a range of values for λ that are regarded probable based on the data. It is expected to differ from the credible interval of the prior distribution. The width of this gap may decrease, indicating a decrease in uncertainty, and move to better match the observed data.
+
+The posterior distribution is a result of merging our prior views with the evidence presented by the new data. If the observed data deviate significantly from the expected values based on the previous information, the posterior distribution will undergo a noticeable shift towards these new observations, indicating a large revision of our views.
+
+
+
+

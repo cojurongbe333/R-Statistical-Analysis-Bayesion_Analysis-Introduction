@@ -1,0 +1,516 @@
+---
+title: "STA6990: Take Home Final"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+```{r}
+library(bayesrules)
+library(stats)
+library(rstan)
+library(bayesplot)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(janitor)
+library(tidyr)
+library(gridExtra)
+library(stats)
+library(base)
+library(zoo)
+library(patchwork)
+library(MASS)
+library(Matrix)
+library(DescTools)
+library(purrr)
+library(caret)
+library(boot)
+library(lattice)
+library(GGally)
+library(emmeans)
+library(modelr)
+library(broom)
+library(performance)
+library(FSA)
+library(car)
+library(RcppEigen)
+library(Rcpp)
+library(coda)
+```
+
+**1. Let $\pi$ denote the proportion of U.S. adults that do not believe in climate change. To learn about $\pi$, we'll use survey data on $n$ adults and count up the number of these that don't believe in climate change, $Y$.**
+
+**a. Using ther `pulse_of_the_nation` data from the `bayesrules` package, report the sample proportion of surveyed adults with the opinion that `climate_change` is `Not Real At All`.**
+
+```{r}
+data("pulse_of_the_nation")
+
+head(pulse_of_the_nation)
+
+not_real_all <- subset(pulse_of_the_nation, climate_change == "Not Real At All")
+
+proportion_not_real_all <- nrow(not_real_all) / nrow(pulse_of_the_nation)
+
+proportion_not_real_all
+```
+The sample proportion of surveyed adults with the opinion that `climate_change` is `Not Real At All` is 0.15 or 15%.
+
+**b. Using a Beta(1,2) prior, specify the posterior model of $\pi$.**
+
+```{r}
+alpha_prior <- 1
+beta_prior <- 2
+
+successes <- 15
+failures <- 100 - successes 
+
+alpha_post <- alpha_prior + successes
+beta_post <- beta_prior + failures
+
+cat(sprintf("The posterior distribution of π, given the data, is Beta(%d, %d).", alpha_post, beta_post))
+
+```
+
+**c. Calculate and interpret a (middle) 95% posterior credible interval for $\pi$.**
+
+```{r}
+alpha_post <- 16
+beta_post <- 87
+
+credible_interval <- qbeta(c(0.025, 0.975), alpha_post, beta_post)
+
+cat("The 95% credible interval for π is:", 
+    sprintf("[%.3f, %.3f]", credible_interval[1], credible_interval[2]))
+```
+The credible interval [0.092, 0.231] encompasses the value 0.1, suggesting that the parameter π (the proportion of U.S. adults who do not believe in climate change) might potentially be either less than or equal to 0.1, or more than 0.1. 
+
+**d. We want to test the following hypotheses:**
+
+$$
+\begin{align*}
+H_0&: \ \pi \le 0.1 \\
+H_1&: \ \pi > 0.1
+\end{align*}
+$$
+```{r}
+alpha_post <- 16
+beta_post <- 87
+
+p_pi_greater_than_0_1 <- 1 - pbeta(0.1, alpha_post, beta_post)
+
+cat("P(π > 0.1 | Y) = ", p_pi_greater_than_0_1)
+
+
+threshold <- 0.95
+
+if (p_pi_greater_than_0_1 > threshold) {
+  cat("Reject H_0: There is substantial evidence that π > 0.1.")
+} else {
+  cat("Fail to reject H_0: Not enough evidence that π > 0.1.")
+}
+
+```
+Let's assume we consider P(π>0.1∣Y)>0.95 as substantial evidence to favor H1.
+Reject H_0: There is substantial evidence that π > 0.1.
+The posterior probability of about 0.9534 indicates that, based on the available data and the prior distribution, there is a 95.34% likelihood that the proportion π of U.S. adults who do not believe in climate change is higher than 0.1. This indicates a significant likelihood and provides compelling evidence against the null hypothesis H_0:π≤0.1.
+
+**Using the credible interval in part c, what decision would you make regarding the hypotheses?**
+
+Given the 95% credible interval for π as [0.092,0.231], regarding the hypotheses:H_0:π≤0.1 vs H_1:π>0.1
+
+If the entire credible interval is greater than 0.1, we reject the null hypothesis (H_0).
+If the credible interval contains the value 0.1, we do not have enough evidence to reject the null hypothesis (H_0).
+Given that the range [0.092,0.231] encompasses the value 0.1, we conclude that we cannot reject the null hypothesis (H_0). This implies that there is inadequate evidence to substantiate the alternative hypothesis H_1 (that π>0.1), as the data suggests that the possibility of π being less than or equal to 0.1 is still viable.
+
+This decision indicates that the data does not offer compelling evidence to clearly infer that more than 10% of U.S. adults feel that climate change is "Not Real At All". The inclusion of 0.1 in the credible interval indicates that there is a possibility that the proportion is higher than 10%. However, the data also provides credible evidence that the proportion might be lower or equal to 10%.
+Verdict: Fail to reject the null hypothesis (H_0).
+Reasoning: The credible interval encompasses the threshold value (0.1), indicating that it is conceivable for the proportion π to be less than or equal to 10% based on the available data.
+Based on the facts and prior information, which suggests a preference for lower values of π, there is not enough evidence to confidently conclude, with a 95% confidence level, that the fraction of skeptics is higher than 10%.
+
+**e. Simulate the posterior model of $\pi$, the proportion of US adults that do not believe in climate change using `rstan`, 4 chains, and 10000 iterations per chain.`**
+
+```{r}
+
+model_code <- '
+data {
+  int<lower=0> alpha_prior;  // alpha parameter of the prior Beta distribution
+  int<lower=0> beta_prior;   // beta parameter of the prior Beta distribution
+}
+
+parameters {
+  real<lower=0, upper=1> pi;  // proportion, constrained between 0 and 1
+}
+
+model {
+  pi ~ beta(alpha_prior, beta_prior);  // prior model
+}
+
+generated quantities {
+  real<lower=0, upper=1> pi_post = beta_rng(16, 87);  // posterior simulation
+}
+'
+
+data_list <- list(
+  alpha_prior = 1,
+  beta_prior = 2
+)
+
+fit <- stan(model_code = model_code, 
+            data = data_list, 
+            iter = 10000, 
+            chains = 4)
+
+posterior_samples <- rstan::extract(fit)$pi_post
+
+print(summary(posterior_samples))
+```
+Posterior Distribution Statistics:
+
+Minimum Value: 0.04938
+1st Quartile: 0.13051
+Median: 0.15343
+Mean: 0.15560
+3rd Quartile: 0.17801
+Maximum Value: 0.31236
+
+The proximity of the median (0.15343) and mean (0.15560) indicates a relatively symmetrical distribution around its central tendency.
+The data exhibits a range of values, spanning from about 0.049 to 0.312, indicating variability. However, the majority of values (50%) are concentrated within the range of around 0.131 to 0.178, as evidenced by the 1st and 3rd quartiles.
+The wide range and central position of the data indicate that a substantial proportion of the estimated posterior distribution of π is greater than 0.1. This strengthens the decision to reject the null hypothesis H_0:π≤0.1, which was based on the 95% credible interval and direct probability calculation.
+
+**f. Produce and discuss trace plots, overlaid density plots, and autocorrelation plots for the four chains.**
+
+```{r}
+posterior_samples <- as.array(fit)  
+
+
+posterior_samples <- rstan::extract(fit, permuted = FALSE, inc_warmup = TRUE)  
+
+print(dim(posterior_samples)) 
+
+color_scheme_set("brightblue")
+
+trace_plots <- mcmc_trace(posterior_samples, pars = "pi")
+print(trace_plots)
+
+density_plots <- mcmc_dens(posterior_samples, pars = "pi")
+print(density_plots)
+
+autocorr_plots <- mcmc_acf(posterior_samples, pars = "pi")
+print(autocorr_plots)
+
+```
+The trace plot displays the sampled values for π over all iterations for each of the four chains. In a well-mixed MCMC sample, we anticipate that the traces of several chains will exhibit substantial overlap and a visually indistinct pattern like a 'fuzzy caterpillar'. This pattern suggests that the chains are exploring the parameter space in a comparable manner and have likely reached a state of convergence to the stationary distribution. The trace plot you have provided exhibits excellent convergence, since the traces of all four chains overlap without any discernible patterns or gaps.
+
+The density plot presents a kernel density estimate of the posterior distribution of π. The function combines the collected values from all chains to display the overall pattern of the distribution. For this plot, it is desirable to observe a unimodal form, with the majority of the data concentrated around the median value. The uploaded density plot exhibits a right-skewed distribution, signifying a greater concentration of values near the lower end of the range, accompanied by a prolonged tail extending towards higher values. This form is characteristic of parameters that are close to zero and are limited to the range of [0, 1].
+
+The autocorrelation graphic illustrates the correlation between the chain and itself at different time delays. A positive indicator in an autocorrelation plot is the rapid decline of correlation as the lag rises. This implies that consecutive samples exhibit a reasonably low level of dependence, which aligns with our objective in MCMC sampling. The autocorrelation plots for all four chains that you have uploaded exhibit a rapid decline in autocorrelation, which is favorable. This suggests that the chains are not experiencing any significant obstacles and that the samples become relatively independent after a few delays.
+
+**g. Find the effective sample size ratio and $\hat{R}$ values for your simulation.**
+
+```{r}
+ess <- summary(fit)$summary['pi', 'n_eff']
+r_hat <- summary(fit)$summary['pi', 'Rhat']
+
+cat("Effective Sample Size (ESS) for pi:", ess, "\n")
+cat("R-hat for pi:", r_hat)
+```
+
+
+**h. Use your simulation results to approximate a middle 95% posterior credible interval for $\pi$.**
+
+```{r}
+posterior_samples <- rstan::extract(fit)$pi
+
+credible_interval <- quantile(posterior_samples, probs = c(0.025, 0.975))
+
+cat("The middle 95% posterior credible interval for π is approximately:", credible_interval)
+```
+
+**i. Use your simulation results to approximate the posterior probability that $\pi > 0.1$.**
+
+```{r}
+posterior_samples <- rstan::extract(fit)$pi
+
+posterior_probability <- mean(posterior_samples > 0.1)
+
+cat("The posterior probability that π > 0.1 is approximately:", posterior_probability)
+```
+
+**j. Explain your overall conclusion about $\pi$.**
+
+The posterior distribution of π is observed to be right-skewed based on the density and trace plots. Additionally, the MCMC chains exhibit satisfactory mixing and convergence. This indicates that the posterior distribution effectively represents the level of uncertainty in π, considering the available facts and prior belief.
+The Effective Sample Size (ESS) refers to the number of independent-like samples. A high ESS indicates that there are enough samples to increase our confidence in the representativeness of the posterior samples.
+
+A high R^ value suggests that the chains have converged effectively, showing that the sampling process has become stable and the chains are collecting samples from the same underlying posterior distribution.
+
+The 95% credible interval for π represents the range in which the true proportion of climate change non-believers is likely to fall with a 95% probability. This interval provides a direct probabilistic interpretation and serves as a Bayesian counterpart to confidence intervals in frequentist statistics.
+The posterior probability of π being greater than 0.1: By calculating the chance that π is greater than 0.1, we may obtain a precise assessment of the evidence that supports the premise that more than 10% of U.S. adults do not believe in climate change. A high posterior probability indicates compelling evidence supporting this idea.
+In summary, based on the evidence gathered and analyzed, we can confidently state that there is a calculated probability, derived from the posterior samples, indicating that the actual number of U.S. adults who do not believe in climate change is higher than 10%. The credible interval enhances our understanding by specifying a range within which π is most likely to be located. The MCMC diagnostics indicate that the estimates and probability are derived from a meticulously executed Bayesian analysis.
+
+If the computed posterior probability that π>0.1 is very high, and considering that the credible interval does not contain 0.1 (or just marginally includes it), we can confidently conclude that there is compelling evidence indicating the presence of a significant minority within the population who do not believe in climate change. These findings could have substantial consequences for policy formulation, public instruction, and efforts to mitigate climate change.
+
+**2. Let $\mu$ denote the typical flipper length (in mm) among Adelie penguins. To learn about $\mu$, we will utilize flipper measurements on a sample of Adelie penguins.**
+
+**a. Your prior understanding is that the average flipper length for all Adelie penguins is about 200mm, but you aren't very sure. It’s plausible that the average could be as low a 140mm or as high as 260mm. Specify an appropriate prior model for $\mu$.**
+
+```{r}
+mu_0 <- 200
+sigma_0 <- 30
+
+prior <- list(mean = mu_0, sd = sigma_0)
+
+plausibility_range <- c(mu_0 - 2 * sigma_0, mu_0 + 2 * sigma_0)
+
+cat("Prior model for mu: N(", prior$mean, ",", prior$sd^2, ")\n")
+cat("Plausible range for mu: [", plausibility_range[1], ",", plausibility_range[2], "]")
+```
+
+The prior mean (μ_0) is around 200 mm, which is our most accurate estimate for the typical flipper length.
+The plausible range for the measurement is from 140 mm to 260 mm, covering a range of 120 mm. This range is chosen to encompass most of the prior probability, specifically 95%.
+If we aim for the range to represent the 95% credible interval for μ, we need to adjust the parameters of the normal prior distribution in a way that ensures about 95% of the distribution falls within this range. The 95% credible interval for a normal distribution spans around two standard deviations from the mean in both positive and negative directions. Therefore, half of the range, which measures 60 mm, should be approximately equivalent to 2 standard deviations:
+
+The value of 60 mm is approximately equal to 2 times the standard deviation (σ_0).
+Therefore, we can estimate σ_0 to be approximately equal to 30 mm by dividing 60 mm by 2.
+Hence, a suitable prior distribution for the parameter μ would be a normal distribution with a mean of 200 and a variance of 30 squared.
+This specifies a Gaussian prior distribution with a mean of 200 mm and a variance of 900 mm^2 (because the standard deviation is 30 mm). This statement posits that the average length of a flipper is approximately 200 mm, but it is plausible for it to fluctuate within the range of 140 mm to 260 mm.
+
+**b. The `penguin_bayes` data in the `bayesrules` package contains data on the flipper lengths for a sample of three different penguin species. For the Adelie `species`, how many data points are there and what is the sample mean of `flipper_length_mm`?**
+
+```{r}
+data(penguins_bayes)%>%
+  na.omit()
+
+head(penguins_bayes)%>%
+  na.omit()
+
+adelie_data <- subset(penguins_bayes, species == "Adelie")%>%
+  na.omit()
+
+
+adelie_count <- nrow(adelie_data)%>%
+  na.omit()
+
+adelie_flipper_mean <- mean(adelie_data$flipper_length_mm)%>%
+  na.omit()
+
+cat("Number of Adelie penguins:", adelie_count, "\n")
+cat("Sample mean of flipper length:", adelie_flipper_mean, "mm")
+```
+Number of Adelie penguins: 146 
+Sample mean of flipper length: 190.1027 mm
+
+**c. Calculate and interpret a middle 95% posterior credible interval for $\mu$.**
+
+```{r}
+mu_prior <- 200      
+sigma_prior <- 30    
+
+x_bar <- 190.1       
+n <- 146             
+s <- 20              
+
+SE <- s / sqrt(n)
+
+sigma_post_squared <- 1 / (1/sigma_prior^2 + n/SE^2)
+mu_post <- sigma_post_squared * (mu_prior/sigma_prior^2 + n*x_bar/SE^2)
+
+sigma_post <- sqrt(sigma_post_squared)
+
+lower_bound <- mu_post - 1.96 * sigma_post
+upper_bound <- mu_post + 1.96 * sigma_post
+
+cat(sprintf("Posterior Mean = %.3f\n", mu_post))
+cat(sprintf("Posterior Standard Deviation = %.3f\n", sigma_post))
+cat(sprintf("95%% Credible Interval = [%.3f, %.3f]", lower_bound, upper_bound))
+```
+The posterior mean of 190.100 mm indicates that, taking into account the prior belief and the sample data, the most accurate estimation for the average flipper length of Adelie penguins is approximately 190.1 mm. The sample mean (190.1 mm) is quite similar to this value, suggesting that the sample data had a substantial impact on the posterior. This is particularly noteworthy considering the relatively larger range of the prior distribution (standard deviation of 30 mm).
+The posterior standard deviation is 0.137 mm.
+The extremely low posterior standard deviation of 0.137 mm signifies a significant level of confidence in the estimated mean. The high level of precision in the estimation is mostly attributed to the huge sample size of 146 penguins. This significantly reduces the range of uncertainty in the estimation compared to the initial belief.
+The 95% credible interval for the average flipper length of Adelie penguins is [189.832, 190.369] mm. This interval indicates that there is a 95% possibility that the true average flipper length falls within this range, based on the available data and prior information. The limited span of this time emphasizes the accuracy of the estimation, which is advantageous for scientific and conservation-oriented purposes.
+
+**d. You hypothesize that the average Adelie flipper length is somewhere between 200 mm and 220 mm. What does your answer in part (c) suggest?**
+
+The posterior mean flipper length of 190.1 mm is far below the expected range of 200 mm to 220 mm. This strongly shows that the actual average flipper length is lower than what the hypothesis proposes.
+The 95% credible interval for the mean (μ) is 189.832 mm to 190.369 mm, which is completely below the hypothesized range. This interval shows the range of values that has a 95% likelihood of containing the genuine mean flipper length, based on the available data and prior information.
+We reject the hypothesis because the posterior mean and the entire 95% credible interval do not fall within the hypothesized range of 200 mm to 220 mm. There is compelling statistical data indicating that the average flipper length of Adelie penguins is significantly lower than the predicted range.
+
+**e. Calculate and interpret the posterior probability that your hypothesis is true.**
+
+```{r}
+mu_post <- 190.100       
+sigma_post <- 0.137      
+
+lower_bound <- 200
+upper_bound <- 220
+
+Z_lower <- (lower_bound - mu_post) / sigma_post
+Z_upper <- (upper_bound - mu_post) / sigma_post
+
+P_lower <- pnorm(Z_lower)  
+P_upper <- pnorm(Z_upper)  
+
+P_hypothesis <- P_upper - P_lower
+
+cat(sprintf("Z-score for lower bound (200 mm): %.3f\n", Z_lower))
+cat(sprintf("Z-score for upper bound (220 mm): %.3f\n", Z_upper))
+cat(sprintf("Probability that 200 mm <= mu <= 220 mm: %.4f", P_hypothesis))
+```
+Both Z-scores are significantly elevated, suggesting that the hypothesized values (200 mm and 220 mm) are located many standard deviations distant from the posterior mean (μ_post = 190.100 mm). More precisely, the minimum value of 200 mm is 72.263 standard deviations distant, which is extremely improbable.
+Negligible Probability: The computed probability of the average flipper length being between 200 mm and 220 mm is close to zero (or almost zero due to floating-point precision). This provides quantitative evidence that supports the rejection of the hypothesis.
+
+This data decisively disproves the concept that the mean flipper length for Adelie penguins falls within the range of 200 mm to 220 mm. The Bayesian framework, using the sample data, indicates a posterior distribution with a mean that is noticeably lower than the expected range.
+
+The probability outcome, which is effectively 0, emphasizes the statistical significance of the data. It suggests that, based on the available data and existing knowledge, it is highly unlikely that the actual average flipper length is within the proposed range.
+
+**f. Calculate and interpret the Bayes Factor for the hypothesis test.**
+
+```{r}
+P_H0 <- 0.0000  
+P_H1 <- 1 - P_H0  
+BF10 <- P_H1 / P_H0  
+
+print(paste("Bayes Factor (BF10) favoring H1 over H0:", BF10))
+```
+
+The Bayes Factor for testing the hypothesis H_0:200 mm≤μ≤220 mm against the alternative H_1:μ<200 mm or μ>220 mm.
+
+1.	Posterior Probability under H_0 (within [200, 220]): Almost 0 (as previously calculated)
+2.	Posterior Probability under H_1 (outside [200, 220]): 1−P(H_0) which is essentially 1.
+
+A high Bayes Factor (BF_10) indicates that the data strongly supports the alternative hypothesis (H_1) over the null hypothesis (H_0). Practically speaking, this means that there is strong statistical evidence indicating that the actual average length of Adelie penguin flippers is not between 200 mm and 220 mm.
+The outcome has noteworthy consequences for comprehending the physical attributes of Adelie penguins, which could potentially impact associated ecological models and conservation measures. 
+
+The strength of evidence is indicated by a Bayes Factor of infinity, which means that the evidence against the null hypothesis (𝐻_0:200 mm≤𝜇≤220 mm) is infinitely strong compared to the alternative (𝐻_1:𝜇<200 mm or 𝜇>220 mm). Practically, this is understood as definitive proof that the actual average flipper length does not fall within the stated range.
+
+The Bayes Factor in Bayesian hypothesis testing measures the degree of support for one hypothesis compared to another. An infinite Bayes Factor indicates that the model and data provide overwhelming support for 𝐻_1, while providing virtually minimal support for 𝐻_0. It implies the necessity to reevaluate any hypotheses or models that assume the average length of a flipper falls within the proposed range.
+
+**g. Explain your overall conclusion about $\mu$.**
+
+The estimated average value of 𝜇 is 190.100 mm, with a highly precise range of values from 189.832 mm to 190.369 mm. The estimate demonstrates a significant degree of accuracy, which is achieved by the utilization of a substantial sample size and a well-informed prior knowledge.
+The notion regarding the average flipper length of Adelie penguins, which said that it falls within the range of 200 mm to 220 mm, has been convincingly disproven. The statistical tests, which involved calculating posterior probabilities and the Bayes Factor, indicated that there is an extremely low likelihood that the true mean falls inside the hypothesized range. The Bayes Factor decisively refuted this range, strongly supporting the alternative hypothesis that the mean lies outside this region.
+The results exhibit a significant level of statistical significance, as indicated by a Bayes Factor that provides infinite support against the hypothesized range. The confidence in this conclusion is strengthened by the narrow credible interval around the posterior mean, suggesting that the observed data closely fit with prior views (modified based on empirical evidence).
+
+The discovery that the average flipper length is approximately 190 mm, rather than being within the range of 200 to 220 mm, could have ramifications for comprehending the physical adaptations of Adelie penguins. These observations could impact our understanding of their swimming efficiency, feeding behavior, and adaptations to their frigid habitat.
+These results may require adjustments to conservation methods that rely on precise size estimations for habitat design, breeding initiatives, or feeding techniques. Precise measurements of size are essential for developing effective conservation strategies that are customized to the species' physical abilities and interactions with the environment.
+
+**3. The loon is a species of bird common to the Ontario region of Canada. Let $\lambda$ denote the typical number of loons observed by a birdwatcher across a 100-hour observation period. To learn about $\gamma$, we'll utilize bird counts collected in $n$ different outings.**
+
+**a. Your prior understanding is that the typical rate of loon sightings is 2 per 100 hours with a standard deviation of 1 per 100 hours. Specify an apporpriate prior model for $\gamma$.**
+
+```{r}
+alpha <- 4
+beta <- 2
+
+lambda_prior <- function(x) {
+  dgamma(x, shape = alpha, rate = beta)
+}
+
+curve(lambda_prior, from = 0, to = 5, col = "blue", lwd = 2,
+      xlab = "Rate of Loon Sightings (lambda per 100 hours)", 
+      ylab = "Density",
+      main = "Prior Distribution for Lambda")
+```
+The Gamma prior for 𝜆can be specified with 𝛼=4 and 𝛽=2, making 𝜆∼Gamma(4,2).
+
+**b. The `loons` data in the `bayesrules` package contains loon counts in different 100-hour observation periods. What is the average loon count per 100 hours?**
+
+```{r}
+data("loons")
+
+average_loon_count <- mean(loons$count)
+
+print(average_loon_count)
+```
+
+
+**c. Calculate and interpret a middle 95% posterior credible interval for $\gamma$.**
+
+```{r}
+X <- sum(loons$count)  
+n <- nrow(loons)  
+
+alpha_post <- alpha + X
+beta_post <- beta + n
+
+lower_bound <- qgamma(0.025, shape = alpha_post, rate = beta_post)
+upper_bound <- qgamma(0.975, shape = alpha_post, rate = beta_post)
+
+alpha_post <- 4 + X  
+beta_post <- 2 + n  
+
+lower_bound <- qgamma(0.025, shape = alpha_post, rate = beta_post)
+upper_bound <- qgamma(0.975, shape = alpha_post, rate = beta_post)
+
+cat("95% Posterior Credible Interval for gamma: [", lower_bound, ", ", upper_bound, "]\n")
+```
+The interval [2.159,3.636] represents the range of values for 𝛾 that are regarded reasonable based on the observed data and the prior belief. This indicates that, with a 95% level of confidence, the actual average rate of loon sightings per 100 hours is likely to be within this specified range.
+This period revises our earlier belief (where we initially estimated the rate to be approximately 2 sightings per 100 hours with a standard deviation of 1) using the actual observation data. The data indicates that the frequency of sightings is probably more than originally assumed.
+The range of the interval, which extends from 2.159 to 3.636, indicates a moderate level of accuracy in our estimation of 𝛾. The accuracy of this measurement is affected by the quantity of data (number of observation sessions) and the fluctuation in the number of sightings during these intervals.
+
+**d. You hypothesize that birdwatchers should anticipate a rate of less than 1 loon per observation period. What does your answer in part (c) suggest?**
+
+The 95% posterior credible interval for 𝛾, the rate of loon sightings per 100 hours, is estimated to be between 2.159 and 3.636. This contradicts the hypothesis that birdwatchers should expect a rate of less than 1 loon every observation period. The confidence interval [2.159, 3.636] is completely higher than the assumed rate of less than 1 loon every 100 hours. This implies that the observed frequency of loon sightings is far greater than what was initially thought.
+
+The findings strongly supports a sighting rate that is larger than the rate that was initially expected. Based on the available data and prior information, the probability of detecting less than 1 loon per 100 hours is extremely low within the Bayesian framework of this research.
+This implies that the number of loons observed is either higher or their visibility is greater than previously anticipated. This phenomenon may be attributed to environmental conditions that enhance the level of loon activity or concentration in the examined areas.
+
+**e. Calculate and interpret the posterior probability that your hypothesis is true.**
+
+```{r}
+alpha_post <- 4 + sum(loons$count)  
+beta_post <- 2 + nrow(loons)  
+
+P_gamma_less_than_1 <- pgamma(1, shape = alpha_post, rate = beta_post)
+
+cat("Posterior probability that gamma is less than 1 per 100 hours:", P_gamma_less_than_1)
+```
+The extremely low posterior probability of 𝛾<1 strongly indicates that the rate of loon sightings is much greater than 1 per 100 hours. This conclusively refutes the original hypothesis that birdwatchers should anticipate a sighting of less than one loon during each observation period.
+This finding indicates that birdwatchers have a high probability of observing more than one loon for every 100 hours of observation. Hence, it is necessary to modify the expectations and resource allocations for birdwatching activities or ecological surveys in order to account for an increased occurrence of sightings.
+The unexpectedly high sighting rate may have ramifications for comprehending the population density, behavior, or habitat conditions of loons in the observed areas. This could suggest that the loon populations are healthier or more concentrated than previously thought, or it could be due to specific behaviors or environmental conditions that lead to more frequent sightings.
+
+**f. Calculate and interpret the Bayes Factor for the hypothesis test.**
+
+```{r}
+alpha_post <- 4  
+beta_post <- 2   
+
+P_H0 <- pgamma(1, shape = alpha_post, rate = beta_post)  
+P_H1 <- 1 - P_H0                                        
+
+BF10 <- P_H1 / P_H0
+
+cat("Bayes Factor (BF10) in favor of H1 over H0:", BF10, "\n")
+
+if (BF10 > 10) {
+    cat("Strong evidence against H0 (gamma < 1) in favor of H1 (gamma >= 1).\n")
+} else if (BF10 < 0.1) {
+    cat("Strong evidence in favor of H0 (gamma < 1) against H1 (gamma >= 1).\n")
+} else {
+    cat("Inconclusive evidence regarding H0 and H1.\n")
+}
+```
+To calculate the Bayes Factor (BF) for the hypothesis test where 𝐻_0:𝛾<1(the rate of loon sightings per 100 hours is less than 1) against 𝐻_1:𝛾≥1(the rate of loon sightings is 1 or more), we need to evaluate how much more likely the data are under one hypothesis compared to the other.
+
+A Bayes Factor of around 6 indicates considerable support for 𝐻_1 (the rate 𝛾 is 1 or more loon sightings per 100 hours) compared to 𝐻_0 (the rate 𝛾 is less than 1 sighting per 100 hours). Based on commonly used standards in Bayesian analysis, a 𝐵𝐹_10 value between 3 and 10 often suggests considerable evidence. Values greater than 10 suggest compelling evidence.
+Values ranging from 1 to 3 are seen as indicative of poor or inconclusive evidence.
+Although the Bayes Factor favors 𝐻_1, it does not surpass the threshold commonly used to indicate substantial evidence. Therefore, the evidence is substantial yet not conclusive.
+
+Considering that the Bayes Factor falls between the range of slightly above 5 to less than 10, it is prudent to approach the interpretation of the results with care. It indicates a pattern or probability, but not complete certainty.
+Additional data could be advantageous. Further observations or data collecting may be beneficial in order to enhance the clarity of the overall image. Additional data has the potential to alter the Bayes Factor, leading to either strong support for 𝐻_1 or a move towards 𝐻_0, depending on the results of future observations.
+Although there is a moderate indication that birdwatchers can anticipate spotting a loon around once per 100 hours, it is advisable to delay making policy choices or taking important actions based on this finding until more definitive information is available or to proceed with an awareness of the existing ambiguity.
+ 
+**g. Explain your overall conclusion about $\gamma$.**
+
+The 95% posterior credible interval for 𝛾 is [2.159, 3.636], suggesting that the most likely values for the rate of loon sightings are within this range. This indicates that birdwatchers can anticipate observing an average of 2 to 4 loons for every 100 hours of observation.
+The Bayes Factor (BF_10=5.99905) offers moderate support for the hypothesis H_1: γ≥1 compared to H_0: γ<1. This suggests that the frequency of loon sightings is probably higher than 1 every 100 hours, which is consistent with the results of the credible interval analysis.
+Both the posterior credible interval and the Bayes Factor provide significant evidence that the frequency of loon sightings is higher than the expected rate of fewer than 1 per 100 hours. This is consistent with ecological observations that indicate a robust or concentrated population of loons in the area under study, or an especially advantageous habitat for loons.
+
+The results yield a significant level of statistical certainty that sightings of loons are frequent and perhaps more prevalent than what most people would expect based on their previous assumptions or estimated rates. This information is essential for ecologists and conservationists as it provides valuable insights into the population dynamics of loons. Understanding these dynamics is critical for implementing effective habitat management and conservation measures.
+Birdwatchers might expect to observe loons more often than once per 100 hours when planning their travels. This information can impact their preparation and anticipated outcomes for birdwatching trips.
+

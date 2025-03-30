@@ -1,0 +1,205 @@
+---
+title: "STA6990: Week 6"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+
+**1. Miles is learning how to make a mug in his ceramics class. A difficult part of the process is creating or "pulling" the handle. His prior model of $\pi$, the probability that one of his handles will actually be good enough for a mug, is below:**
+
+| $\pi$        | 0.1   | 0.25    | 0.4    |
+|--------------|--------|--------|--------|
+| $f(\pi)$ | 0.2 | 0.45 | 0.35 |
+
+**1a. Miles has enough clay for 7 handles. Let $Y$ be the number of handles that will be good enough for a mug. Specify the model for the dependence of $Y$ on $\pi$ and the corresponding pmf, $f(y|\pi)$.**
+
+```{r}
+n <- 7 
+pis <- c(0.1, 0.25, 0.4) 
+
+binom_pmf <- function(n, pi, y) {choose(n, y) * pi^y * (1 - pi)^(n - y)}
+
+for (pi in pis) {
+  cat(sprintf("\nFor pi = %.2f:\n", pi))
+  for (y in 0:n) {
+    pmf <- binom_pmf(n, pi, y)
+    cat(sprintf("P(Y = %d|pi = %.2f) = %.4f\n", y, pi, pmf))}}
+
+
+```
+```{r}
+y_values <- 0:7
+prob_pi_01 <- c(0.4783, 0.3720, 0.1240, 0.0230, 0.0026, 0.0002, 0.0000, 0.0000)
+prob_pi_025 <- c(0.1335, 0.3115, 0.3115, 0.1730, 0.0577, 0.0115, 0.0013, 0.0001)
+prob_pi_04 <- c(0.0280, 0.1306, 0.2613, 0.2903, 0.1935, 0.0774, 0.0172, 0.0016)
+
+plot(y_values, prob_pi_01, type='b', col='blue', pch=19, ylim=c(0, max(c(prob_pi_01, prob_pi_025, prob_pi_04))), xlab='Number of Good Handles (Y)', ylab='Probability', main='P(Y|pi)')
+lines(y_values, prob_pi_025, type='b', col='green', pch=19)
+lines(y_values, prob_pi_04, type='b', col='red', pch=19)
+legend("topright", legend=c("pi=0.1", "pi=0.25", "pi=0.4"), col=c("blue", "green", "red"), pch=19)
+```
+
+The model for the dependence of Y (the number of handles that will be good enough for a mug) on 
+π (the probability that one of his handles will be good enough) is a binomial model.
+
+For π=0.1, the pmf f(y∣0.1) would be calculated as:
+f(y∣0.1)=(7 choose y )(0.1^y)[(0.9^(7−y))]
+ 
+
+For π=0.25, the pmf f(y∣0.25) would be:
+f(y∣0.25)=(7 choose y)(0.25^y)[(0.75)^(7−y))]
+
+For π=0.4, the pmf f(y∣0.4) would be:
+f(y∣0.4)=(7 choose y)(0.4^y)[(0.6)^(7−y))]
+
+
+**1b. Miles pulls 7 handles and only 2 of them are good enough for a mug. What is the posterior pmf of $\pi$, $f(\pi|y=1)$?**
+
+P(Y=2∣π)=(7/2)(π^2)[(1−π)^(7−2)]
+
+For π=0.1, the posterior probability is approximately 0.097.
+For π=0.25, the posterior probability is approximately 0.547.
+For π=0.4, the posterior probability is approximately 0.357.
+
+**1c. Compare the posterior model to the prior model of $\pi$. How would you characterize the differences between them?**
+
+| π   | Prior f(π) | Posterior f(π∣Y=2) 
+| 0.1 | 0.2        | 0.097             
+| 0.25| 0.45       | 0.547             
+| 0.4 | 0.35       | 0.357     
+
+Decrease in Probability for π=0.1. After observing the results (2 out of 7 handles were good), the model has become less confident in the likelihood that the success rate (π) is as low as 10%.
+
+Increase in Probability for π=0.25. The model now considers the 25% success rate to be more likely than before. This value of π now has the highest posterior probability, reflecting the data's support for this success rate.
+
+Slight Increase for π=0.4. Slight increase in the model's confidence that the success rate could be as high as 40%, based on the evidence.
+
+**1d. Miles' instructor, Kris, had a different prior for his ability to pull a handle, below. Find Kris's posterior $f(\pi|y=2)$ and compare it to Miles'.**
+
+| $\pi$        | 0.1   | 0.25    | 0.4    |
+|--------------|--------|--------|--------|
+| $f(\pi)$ | 0.15 | 0.15 | 0.7 |
+
+```{r}
+pis <- c(0.1, 0.25, 0.4)
+prior_probs_miles <- c(0.2, 0.45, 0.35)
+prior_probs_kris <- c(0.15, 0.15, 0.7)
+y <- 2
+n <- 7
+
+binomial_likelihood <- function(p, n, y) {
+  choose(n, y) * p^y * (1-p)^(n-y)}
+
+likelihoods <- sapply(pis, function(pi) binomial_likelihood(pi, n, y))
+
+unnormalized_posteriors_miles <- likelihoods * prior_probs_miles
+unnormalized_posteriors_kris <- likelihoods * prior_probs_kris
+
+posterior_probs_miles <- unnormalized_posteriors_miles / sum(unnormalized_posteriors_miles)
+posterior_probs_kris <- unnormalized_posteriors_kris / sum(unnormalized_posteriors_kris)
+
+cat("Miles' Posterior Probabilities:\n")
+print(posterior_probs_miles)
+cat("\nKris' Posterior Probabilities:\n")
+print(posterior_probs_kris)
+
+```
+
+---
+
+**2. An article in The Daily Beast reports differing opinions on the proportion of museum artworks that are fake or forged. Please read the article here: [https://www.thedailybeast.com/are-over-half-the-works-on-the-art-market-really-fakes?ref=scroll](https://www.thedailybeast.com/are-over-half-the-works-on-the-art-market-really-fakes?ref=scroll).**
+
+<!-- The rest is for class on Wednesday, do not work ahead!!! Only read the article before coming to class on Wednesday! -->
+
+**Complete the following questions with your group. Nominate one person to present 2a and 2c.**
+
+**2a. After reading the article, define your own prior model for different $\pi$ and provide evidence from the article to justify your choice.**
+
+π=0.1 (10%): Experts like Oliver Sears say the number is well below 2%, which shows that people are skeptical of estimates that put it at a very high level. If you want to be safe, a 10% guess might be a good starting point.
+
+π=0.3 (30%): Because of Thomas Hoving's experience and the fact that fakes and copies do exist, a 30% chance might be a reasonable estimate of how common fakes are in the market.
+
+π=0.5 (50%): Even though the stated 70% by the Swiss lab is probably too high because of selection bias, the problem is still seen as very serious. A 50% chance could mean that the market is less regulated and due research is not as strict.
+
+In order to assign prior probabilities to these values, a judgment call will be necessary. An individual may place greater reliance on the moderate estimate of 30% if they hold the belief that the issue is substantial, albeit not as pervasive, as the most extreme assertions imply. To illustrate, a potential prior distribution might consist of the values 0.2 for π=0.1, 0.6 for π=0.3, and 0.2 for π=0.5. This distribution would exhibit a preference for moderate estimates while also allowing for the potential occurrence of forgery rates ranging from lower to higher.
+
+**2b. Compare your prior to the one shown in class. What is similar? Different?**
+π=0.2 with a prior probability f(π)=0.25
+π=0.4 with a prior probability f(π)=0.50
+π=0.6 with a prior probability f(π)=0.25
+
+My prior model π values and probabilities:
+
+π=0.1 to reflect an optimistic view where most of the art is genuine.
+π=0.3 as a moderate estimate acknowledging the presence of forgeries.
+π=0.5 as a pessimistic view that aligns with higher estimates in the article.
+
+Similarities:
+
+Both priors recognize a range of possible values for π instead of a single estimate. This shows that there is doubt about how many fakes are really in the art market.
+
+For any probability distribution, each of the models that came before it gives probabilities that add up to 1.
+
+Differences:
+
+Different numbers of π are being looked at. The prior from the article has values of 0.1, 0.3, and 0.5, which shows an optimistic, somewhat optimistic, and somewhat negative view about the art market, respectively. The class prior has values of 0.2, 0.4, and 0.6, which point to a generally less optimistic view.
+
+There is a different spread of belief across these ideals. The prior from the article seems to give the optimistic and pessimistic views similar weight (10% and 50%), while the moderate view gets a little less weight (30%). The class prior gives the moderate view (0.4) the most weight (0.5), while the hopeful and pessimistic views (0.2 and 0.6) each get less weight (0.25).
+
+**2c. Suppose you randomly choose 10 artworks. Assuming the prior from part a, what is the minimum number of artworks that would need to be forged for $f(\pi=0.6|Y=y)>0.4$?**
+
+```{r}
+adjusted_prior_probs <- c(1/3, 1/3, 1/3)  
+adjusted_pi_values <- c(0.1, 0.3, 0.5)
+
+n_artworks <- 10
+
+dbinom_vectorized <- function(y, size, prob) {
+  sapply(prob, function(p) dbinom(y, size, p))}
+
+posterior_probs_list <- lapply(0:n_artworks, function(y) {
+  likelihood <- dbinom_vectorized(y, n_artworks, adjusted_pi_values)
+  posterior <- adjusted_prior_probs * likelihood
+  posterior / sum(posterior) 
+})
+
+min_y_for_posterior <- sapply(posterior_probs_list, function(posterior) posterior[3]) > 0.4
+min_y_index <- which(min_y_for_posterior)[1]
+
+list(min_y = min_y_index - 1, posterior_probs = posterior_probs_list[[min_y_index]])
+```
+The minimum number of artworks that would need to be forged for $f(\pi=0.6|Y=y)>0.4$ is 4.
+
+**2d. Suppose you randomly choose 10 artworks. Assuming the prior from class, what is the minimum number of artworks that would need to be forged for $f(\pi=0.6|Y=y)>0.4$?**
+
+
+```{r}
+prior_probs <- c(0.25, 0.5, 0.25)
+names(prior_probs) <- c("0.2", "0.4", "0.6")
+
+likelihood <- function(y, pi, n) {dbinom(y, n, pi)}
+
+calculate_posterior <- function(y, pi_value, prior_probs, n = 10) {
+  likelihoods <- sapply(names(prior_probs), function(pi) likelihood(y, as.numeric(pi), n))
+  priors <- as.numeric(prior_probs)
+  posteriors <- likelihoods * priors / sum(likelihoods * priors)
+  names(posteriors) <- names(prior_probs)
+  return(posteriors[as.character(pi_value)])
+}
+
+
+results <- sapply(0:10, function(y) calculate_posterior(y, "0.6", prior_probs))
+min_y <- which(results > 0.4)[1]
+
+min_y
+```
+
+The prior model where the probabilities for π are 0.25 for 0.2, 0.5 for 0.4, and 0.25 for 0.6, we find that the minimum number of forged artworks out of 10 such that the posterior probability of π=0.6 given Y=y is greater than 0.4, is 7.
+
+

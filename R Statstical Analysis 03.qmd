@@ -1,0 +1,182 @@
+---
+title: "STA6990: Week 3"
+author: "Chantal Ojurongbe"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  html:
+    embed-resources: true
+editor: source
+---
+```{r}
+library(glmnet)
+library(nnet)
+library(boot)
+library(fastDummies)
+library(haven)
+library(lindia)
+library(tidyverse)
+library(gsheet)
+library(DescTools)
+library(FSA)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(agricolae)
+library(gmodels)
+library(dplyr)
+library(car)
+library(readr)
+library(broom)
+library(modelr)
+library(performance)
+library(GGally)
+library(emmeans)
+library(visreg)
+library(see)
+library(patchwork)
+library(caret)
+```
+
+**1. Suppose we roll two fair dice and you keep track of the larger of the two rolls.**
+
+**a. What is the sample space?**
+
+The sample space for the larger of the two dice rolls is {1, 2, 3, 4, 5, 6}
+    
+**b. Let $X$ = the larger of the two numbers. Derive the probability distribution.**
+
+X = 1: Since each die has 6 faces, and there are 2 dice, there are 6×6=36 6×6=36 possible outcomes).
+X = 2: (1,2), (2,1), and (2,2). That's 3 out of 36.
+X = 3: (1,3), (2,3), (3,1), (3,2), and (3,3). That's 5 out of 36.
+X = 4: (1,4), (2,4), (3,4), (4,1), (4,2), (4,3), and (4,4). That's 7 out of 36.
+X = 5: (1,5), (2,5), (3,5), (4,5), (5,1), (5,2), (5,3), and (5,4), and (5,5). That's 9 out of 36.
+X = 6: (1,6), (2,6), (3,6), (4,6), (5,6), (6,1), (6,2), (6,3), (6,4), (6,5), and (6,6). That's 11 out of 36.
+
+P(X=1)= 1/36  ≈0.028
+P(X=2)= 3/36  ≈0.083
+P(X=3)= 5/36  ≈0.139
+P(X=4)= 7/36  ≈0.194
+P(X=5)= 9/36  =0.25
+P(X=6)= 11/36 ≈0.306
+This probability distribution shows that it's more likely for the larger number to be higher, with the probability increasing as the value of X increases from 1 to 6.
+
+**c. Verify that your answer in (b) is a valid probability distribution.**
+
+To verify that the derived probability distribution is valid, it must satisfy two key conditions:
+Non-Negativity: Each probability value P(X=x) must be non-negative (i.e., P(X=x)≥0 for all x).
+Total Probability Equals 1: The sum of all the probability values must equal 1 (i.e., ∑P(X=x)=1).
+P(X=1)= 1/36
+P(X=2)= 3/36
+P(X=3)= 5/36
+P(X=4)= 7/36
+P(X=5)= 9/36
+P(X=6)= 11/36
+All these probabilities are non-negative. The sum of all the probability values in the distribution is 1.0. Since each probability value is non-negative and their sum equals 1, the probability distribution is valid.
+
+**2. A man with 5 keys wants to open the door and tries keys at random. Exactly one key will open the door. Assume that unsuccessful keys are eliminated from future attempts.**
+
+**a. What is the sample space?**
+
+The sample space is: { {1}, {2}, {3}, {4}, {5} }, where each number is the attempts where the correct key is used. This shows all the possible outcomes for the number of attempts needed to open the door.
+
+**b. Let $X$ = the key's number that opens the door. Derive the probability distribution.**
+
+The probability distribution for X is:
+P(X=1)= 1/5 =0.2
+P(X=2)= 1/5 =0.2 
+P(X=3)= 1/5 =0.2
+P(X=4)= 1/5 =0.2
+This distribution is valid as each probability is non-negative and the sum of all probabilities equals.
+
+**c. Verify that your answer in (b) is a valid probability distribution.**
+
+To verify that the derived probability distribution is valid, it must satisfy two key conditions:
+Non-Negativity: Each probability value P(X=x) must be non-negative (i.e., P(X=x)≥0 for all x).
+Total Probability Equals 1: The sum of all the probability values must equal 1 (i.e., ∑P(X=x)=1).
+P(X=1) =0.2
+P(X=2) =0.2 
+P(X=3) =0.2
+P(X=4) =0.2
+All these probabilities are non-negative. The sum of all the probability values in the distribution is 1.0. Since each probability value is non-negative and their sum equals 1, the probability distribution is valid.
+
+**d. Take the code in lecture used to simulate values and edit to simulate 1000 trials. Graph the resulting distribution.**
+
+```{r}
+one_trial <- function() {
+  keys <- 1:5
+  sample(keys, size = 1, replace = TRUE)
+}
+
+set.seed(8571) 
+sim_1000 <- tibble(Key = replicate(1000, one_trial()))
+
+freq_distribution <- sim_1000 %>% count(Key)
+
+freq_distribution %>% 
+  ggplot(aes(x = Key, y = n)) +
+  geom_col() + 
+  labs(x = "Key Number", y = "Frequency", title = "Frequency Distribution of the Correct Key in 1000 Trials") + 
+  scale_x_continuous(breaks = 1:5) + 
+  theme_minimal()
+```
+
+**3. A standard drug is known to be effective in 80% of the cases in which it is used. A new drug is tested on 100 patients and found to be effective in 85 cases. Is the new drug superior? (Hint: Use R to find the probability of observing 85 or more successes assuming that the new and old drugs are equally effective.)**
+
+```{r}
+n <- 100         
+p <- 0.8         
+successes <- 85  
+
+prob <- 1 - pbinom(successes - 1, n, p)
+prob
+```
+The probability of observing 85 or more successes assuming that the new and old drugs are equally effective is 12.9%.
+
+**4. CHALLENGE! Let the number of chocolate chips in a certain type of cookie have a Poisson distribution. Suppose that, on average, there are 7 chocolate chips per cookie.**
+
+**a. Use R to find the probability of two chocolate chips in a cookie.**
+
+```{r}
+lambda <- 7  
+k <- 2       
+
+prob <- dpois(k, lambda)
+prob
+```
+The probability of two chocolate chips in a cookie is 2.23%.
+
+**b. Use R to find the probability of at least two chocolate chips in a cookie.**
+
+```{r}
+lambda <- 7  
+
+prob_0_or_1 <- ppois(1, lambda)  
+
+prob_at_least_2 <- 1 - prob_0_or_1
+
+prob_at_least_2
+```
+The probability of at least two chocolate chips in a cookie is 99.27%.
+
+**c. Simulate the results from 10000 cookies and graph the resulting distribution.**
+
+```{r}
+
+num_cookies <- 10000  
+lambda <- 7           
+
+choc_chips <- rpois(num_cookies, lambda)
+
+cookies_df <- data.frame(ChocChips = choc_chips)
+
+ggplot(cookies_df, aes(x = ChocChips)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black") +
+  labs(title = "Distribution of Chocolate Chips in 10000 Cookies",
+       x = "Number of Chocolate Chips",
+       y = "Frequency") +
+  theme_minimal()
+```
+
