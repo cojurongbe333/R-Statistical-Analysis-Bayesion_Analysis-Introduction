@@ -3,7 +3,7 @@
 This repository contains a comprehensive collection of R Quarto (`.qmd`) files created as part of **STA6990 - Statistical Analysis**. Each document corresponds to a different week, project, or final assignment in the course and includes R-based data analysis, statistical modeling, and visualization techniques.
 
 Author: **Chantal Ojurongbe**  
-Format: HTML via Quarto  
+Format: Quarto (.qmd)   
 Language: **R**  
 Tool: **RStudio**
 
